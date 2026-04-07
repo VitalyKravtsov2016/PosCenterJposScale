@@ -1,0 +1,125 @@
+group 'shtrihjavapos'
+
+apply plugin: 'java'
+apply plugin: 'idea'
+
+clean.doFirst {
+    delete "${projectDir}/../dist/zip/javase"
+    delete "${projectDir}/build/"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = [ "src" ]
+        }
+        resources {
+            srcDirs = [ "${projectDir}/src/" ]
+            includes = [ "res/*.*", "**/resources/*.*" ]
+        }
+    }
+    // Эта секция уже настроена правильно, но я явно указываю для ясности
+    test {
+        java {
+            srcDirs = [ "test" ] // Папка с тестами
+        }
+        resources {
+            srcDirs = [ "test" ]
+            includes = [ "**/*.properties", "**/*.xml" ]
+        }
+    }
+	
+    acceptanceTest {
+        java {
+            srcDirs = ["test-acceptance"]
+        }
+    }	
+}
+
+repositories {
+    flatDir {
+        dirs "${projectDir}/../lib"
+    }
+    // Добавляем Maven Central для скачивания недостающих зависимостей
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'javapos:javapos:1.14.2'
+    implementation 'log4j-api:log4j-api:2.25.1'
+    implementation 'log4j-core:log4j-core:2.25.1'
+    implementation 'nrjavaserial:nrjavaserial:3.9.3'
+    implementation 'xerces:xercesImpl:2.12.2'
+
+    // Зависимости для тестов
+    testImplementation 'org.hamcrest:hamcrest-core:1.3'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:4.11.0'
+    testImplementation 'net.bytebuddy:byte-buddy:1.12.19'
+    testImplementation 'net.bytebuddy:byte-buddy-agent:1.12.19'
+	testImplementation 'org.objenesis:objenesis:3.3'
+    
+    // Добавляем возможность использовать implementation зависимости в тестах
+    testImplementation configurations.implementation
+}
+
+task utilVersionClass() {
+    def clazz = new File("${projectDir}/src/ru/poscenter/util/ServiceVersion.java")
+    clazz.text = "package ru.poscenter.util;\n\npublic class ServiceVersion {\n    public static final String VERSION = \""+version+"\";\n}"
+}
+
+jar {
+    archiveFileName = "pcscale-1.13.1.jar"
+    manifest {
+        attributes(
+            "Implementation-Title": "POSCenter.JavaPOS",
+            "Class-Path": configurations.compileClasspath.collect { it.getName() }.join(' '),
+            "Implementation-Version": version
+        )
+    }
+}
+jar.dependsOn('utilVersionClass')
+
+task dist(type: Zip) {
+    destinationDirectory = file("${rootDir}/../dist/zip/javase/")
+    archiveBaseName = 'poscenter-jpos-scale'
+    dependsOn jar
+    
+    from jar.archiveFile
+    from configurations.compileClasspath
+    from "Res/"
+    from "${rootDir}/../History.txt"
+    from "${rootDir}/../Doc/JposScaleDriver.txt"
+}
+
+artifacts {
+   archives dist
+}
+
+// Добавляем задачу для запуска только тестов
+task runTests(type: Test) {
+    useJUnit()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = true
+    }
+}
+
+// Указываем кодировку для компиляции
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// Настройка для тестов
+test {
+    useJUnit()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    
+    // Показывать вывод тестов в консоли
+    testLogging.showStandardStreams = true
+}
