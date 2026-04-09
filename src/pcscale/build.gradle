@@ -48,6 +48,7 @@ dependencies {
     implementation 'javapos:javapos:1.14.2'
     implementation 'log4j-api:log4j-api:2.25.1'
     implementation 'log4j-core:log4j-core:2.25.1'
+    //implementation 'nrjavaserial:nrjavaserial:5.2.1'
     implementation 'nrjavaserial:nrjavaserial:3.9.3'
     implementation 'xerces:xercesImpl:2.12.2'
 
@@ -57,10 +58,10 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:4.11.0'
     testImplementation 'net.bytebuddy:byte-buddy:1.12.19'
     testImplementation 'net.bytebuddy:byte-buddy-agent:1.12.19'
-	testImplementation 'org.objenesis:objenesis:3.3'
+    testImplementation 'org.objenesis:objenesis:3.3'
     
-    // Добавляем возможность использовать implementation зависимости в тестах
-    testImplementation configurations.implementation
+    // ИСПРАВЛЕНО: Добавляем возможность использовать implementation зависимости в тестах
+    //testImplementation files(configurations.implementation.files)
 }
 
 task utilVersionClass() {
