@@ -38,12 +38,12 @@ import jpos.events.JposEvent;
 import jpos.events.OutputCompleteEvent;
 import jpos.events.StatusUpdateEvent;
 import jpos.services.EventCallbacks;
-import jpos.services.ScaleService113;
+import jpos.services.ScaleService114;
 
 /**
- * Реализация сервиса весов для JPOS 1.13 с полным логированием
+ * Реализация сервиса весов для JPOS 1.14 с полным логированием
  */
-public class ScaleService extends Scale implements ScaleService113 {
+public class ScaleService extends Scale implements ScaleService114 {
 
     private static final long serialVersionUID = 6309237509625068100L;
     private final Logger logger = LogManager.getLogger(ScaleService.class);
@@ -324,7 +324,62 @@ public class ScaleService extends Scale implements ScaleService113 {
         return result;
     }
 
+    @Override
+    public boolean getCapFreezeValue() throws JposException {
+        logger.debug("getCapFreezeValue");
+        checkOpened();
+        boolean result = false;
+        logger.debug("getCapFreezeValue: " + result);
+        return result;
+    }
+
+    @Override
+    public boolean getCapReadLiveWeightWithTare() throws JposException {
+        logger.debug("getCapReadLiveWeightWithTare");
+        checkOpened();
+        boolean result = false;
+        logger.debug("getCapReadLiveWeightWithTare: " + result);
+        return result;
+    }
+
+    @Override
+    public boolean getCapSetPriceCalculationMode() throws JposException {
+        logger.debug("getCapSetPriceCalculationMode");
+        checkOpened();
+        boolean result = false;
+        logger.debug("getCapSetPriceCalculationMode: " + result);
+        return result;
+    }
+
+    @Override
+    public boolean getCapSetUnitPriceWithWeightUnit() throws JposException {
+        logger.debug("getCapSetUnitPriceWithWeightUnit");
+        checkOpened();
+        boolean result = false;
+        logger.debug("getCapSetUnitPriceWithWeightUnit: " + result);
+        return result;
+    }
+
+    @Override
+    public boolean getCapSpecialTare() throws JposException {
+        logger.debug("getCapSpecialTare");
+        checkOpened();
+        boolean result = false;
+        logger.debug("getCapSpecialTare: " + result);
+        return result;
+    }
+
+    @Override
+    public boolean getCapTarePriority() throws JposException {
+        logger.debug("getCapTarePriority");
+        checkOpened();
+        boolean result = false;
+        logger.debug("getCapTarePriority: " + result);
+        return result;
+    }
+
     // ======================== СВОЙСТВА ========================
+    @Override
     public int getMinimumWeight() throws JposException {
         logger.debug("getMinimumWeight");
         checkOpened();
@@ -978,18 +1033,86 @@ public class ScaleService extends Scale implements ScaleService113 {
         throw e;
     }
 
+    @Override
+    public void doPriceCalculating(int[]  weightValue,
+                                   int[]  tare,
+                                   long[] unitPrice,
+                                   long[] unitPriceX,
+                                   int[]  weightUnitX,
+                                   int[]  weightNumeratorX,
+                                   int[]  weightDenominatorX,
+                                   long[] price,
+                                   int    timeout) throws JposException {
+        logger.debug("doPriceCalculating(...)");
+        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
+        logger.error("doPriceCalculating: " + e.getMessage());
+        throw e;
+    }
+
+    @Override
+    public void freezeValue(int item, boolean freeze) throws JposException {
+        logger.debug("freezeValue(" + item + ", " + freeze + ")");
+        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
+        logger.error("freezeValue: " + e.getMessage());
+        throw e;
+    }
+
+    @Override
+    public void readLiveWeightWithTare(int[] weightData, int[] tare, int timeout) throws JposException {
+        logger.debug("readLiveWeightWithTare(" + weightData + ", " + tare + ", " + timeout + ")");
+        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
+        logger.error("readLiveWeightWithTare: " + e.getMessage());
+        throw e;
+    }
+
+    @Override
+    public void setPriceCalculationMode(int mode) throws JposException {
+        logger.debug("setPriceCalculationMode(" + mode + ")");
+        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
+        logger.error("setPriceCalculationMode: " + e.getMessage());
+        throw e;
+    }
+
+    @Override
+    public void setSpecialTare(int mode, int data) throws JposException {
+        logger.debug("setSpecialTare(" + mode + ", " + data + ")");
+        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
+        logger.error("setSpecialTare: " + e.getMessage());
+        throw e;
+    }
+
+    @Override
+    public void setTarePrioity(int priority) throws JposException {
+        logger.debug("setTarePrioity(" + priority + ")");
+        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
+        logger.error("setTarePrioity: " + e.getMessage());
+        throw e;
+    }
+
+    @Override
+    public void setUnitPriceWithWeightUnit(long unitPrice,
+                                           int  weightUnit,
+                                           int  weightNumerator,
+                                           int  weightDenominator) throws JposException {
+        logger.debug("setUnitPriceWithWeightUnit(" + unitPrice + ", " + weightUnit + ", "
+                + weightNumerator + ", " + weightDenominator + ")");
+        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
+        logger.error("setUnitPriceWithWeightUnit: " + e.getMessage());
+        throw e;
+    }
+
     // ======================== ИНФОРМАЦИОННЫЕ МЕТОДЫ ========================
     @Override
     public String getDeviceServiceDescription() throws JposException {
         logger.debug("getDeviceServiceDescription()");
-        String result = "Scale Service v1.13";
+        String result = "Scale Service v1.14";
         logger.debug("getDeviceServiceDescription: " + result);
         return result;
     }
 
     @Override
     public int getDeviceServiceVersion() throws JposException {
-        int version = 1013000 + ServiceVersionUtil.getVersionInt();
+        int version = 1014000 + ServiceVersionUtil.getVersionInt();
         logger.debug("getDeviceServiceVersion()");
         logger.debug("getDeviceServiceVersion: " + version);
         return version;
