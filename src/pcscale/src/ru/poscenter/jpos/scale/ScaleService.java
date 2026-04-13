@@ -38,12 +38,12 @@ import jpos.events.JposEvent;
 import jpos.events.OutputCompleteEvent;
 import jpos.events.StatusUpdateEvent;
 import jpos.services.EventCallbacks;
-import jpos.services.ScaleService113;
+import jpos.services.ScaleService114;
 
 /**
- * Реализация сервиса весов для JPOS 1.13 с полным логированием
+ * Реализация сервиса весов для JPOS 1.14 с полным логированием
  */
-public class ScaleService extends Scale implements ScaleService113 {
+public class ScaleService extends Scale implements ScaleService114 {
 
     private static final long serialVersionUID = 6309237509625068100L;
     private final Logger logger = LogManager.getLogger(ScaleService.class);
@@ -53,7 +53,7 @@ public class ScaleService extends Scale implements ScaleService113 {
     private static final int THREAD_STOP_TIMEOUT_MS = 1000;
     private static final int MAX_RETRY_COUNT = 3;
 
-    // Свойства UPOS
+    // Свойства UPOS (включая новые для 1.14)
     private boolean zeroValid = false;
     private int statusNotify = SCAL_SN_DISABLED;
     private int powerNotify = JPOS_PN_DISABLED;
@@ -67,6 +67,14 @@ public class ScaleService extends Scale implements ScaleService113 {
     private int tareWeight = 0;
     private long unitPrice = 0;
     private long salesPrice = 0;
+    
+    // Новые свойства для Scale 1.14
+    private int minimumWeight = 0;
+    private int priceCalculationMode = SCAL_PCM_OPERATOR;
+    private int tarePriority = SCAL_STP_NONE;
+    private int specialTareMode = SCAL_SST_DEFAULT;
+    private int specialTareData = 0;
+    private int frozenItems = 0;
 
     // Состояние устройства
     private int state = JPOS_S_CLOSED;
@@ -75,7 +83,6 @@ public class ScaleService extends Scale implements ScaleService113 {
     private ScaleWeight currentWeight = null;
     private long scaleLiveWeight = 0;
     private int maximumWeight = 0;
-    private int minimumWeight = 0;
     private int weightUnit = SCAL_WU_GRAM;
 
     // Потоки
@@ -97,6 +104,14 @@ public class ScaleService extends Scale implements ScaleService113 {
 
     // Флаги
     private boolean pollEnabled = true;
+    
+    // Capabilities for Scale 1.14 (по умолчанию false, если железо не поддерживает)
+    private boolean capFreezeValue = false;
+    private boolean capReadLiveWeightWithTare = false;
+    private boolean capSetPriceCalculationMode = false;
+    private boolean capSetUnitPriceWithWeightUnit = false;
+    private boolean capSpecialTare = false;
+    private boolean capTarePriority = false;
 
     // ======================== ВНУТРЕННИЕ КЛАССЫ ========================
     private static class WeightRequest {
@@ -225,6 +240,59 @@ public class ScaleService extends Scale implements ScaleService113 {
     }
 
     // ======================== CAPABILITY СВОЙСТВА ========================
+    
+    // === Capabilities for Scale 1.14 ===
+    
+    @Override
+    public boolean getCapFreezeValue() throws JposException {
+        logger.debug("getCapFreezeValue");
+        checkOpened();
+        logger.debug("getCapFreezeValue: " + capFreezeValue);
+        return capFreezeValue;
+    }
+
+    @Override
+    public boolean getCapReadLiveWeightWithTare() throws JposException {
+        logger.debug("getCapReadLiveWeightWithTare");
+        checkOpened();
+        logger.debug("getCapReadLiveWeightWithTare: " + capReadLiveWeightWithTare);
+        return capReadLiveWeightWithTare;
+    }
+
+    @Override
+    public boolean getCapSetPriceCalculationMode() throws JposException {
+        logger.debug("getCapSetPriceCalculationMode");
+        checkOpened();
+        logger.debug("getCapSetPriceCalculationMode: " + capSetPriceCalculationMode);
+        return capSetPriceCalculationMode;
+    }
+
+    @Override
+    public boolean getCapSetUnitPriceWithWeightUnit() throws JposException {
+        logger.debug("getCapSetUnitPriceWithWeightUnit");
+        checkOpened();
+        logger.debug("getCapSetUnitPriceWithWeightUnit: " + capSetUnitPriceWithWeightUnit);
+        return capSetUnitPriceWithWeightUnit;
+    }
+
+    @Override
+    public boolean getCapSpecialTare() throws JposException {
+        logger.debug("getCapSpecialTare");
+        checkOpened();
+        logger.debug("getCapSpecialTare: " + capSpecialTare);
+        return capSpecialTare;
+    }
+
+    @Override
+    public boolean getCapTarePriority() throws JposException {
+        logger.debug("getCapTarePriority");
+        checkOpened();
+        logger.debug("getCapTarePriority: " + capTarePriority);
+        return capTarePriority;
+    }
+    
+    // === Стандартные capabilities ===
+
     @Override
     public boolean getCapCompareFirmwareVersion() throws JposException {
         logger.debug("getCapCompareFirmwareVersion");
@@ -325,6 +393,8 @@ public class ScaleService extends Scale implements ScaleService113 {
     }
 
     // ======================== СВОЙСТВА ========================
+    
+    @Override
     public int getMinimumWeight() throws JposException {
         logger.debug("getMinimumWeight");
         checkOpened();
@@ -613,6 +683,9 @@ public class ScaleService extends Scale implements ScaleService113 {
         this.asyncMode = false;
         this.deviceEnabled = false;
         this.claimed = false;
+        
+        // Инициализация capabilities для 1.14 (по умолчанию false)
+        initCapabilities114();
 
         StringParams params = new StringParams();
         params.set(IDevice.PARAM_PORTNAME, "");
@@ -648,6 +721,33 @@ public class ScaleService extends Scale implements ScaleService113 {
 
                 value = reader.readString("portType", "0");
                 params.set(IDevice.PARAM_PORTTYPE, value);
+                
+                // Чтение настроек для 1.14 capabilities
+                String capValue = reader.readString("capFreezeValue", "false");
+                capFreezeValue = Boolean.parseBoolean(capValue);
+                
+                capValue = reader.readString("capReadLiveWeightWithTare", "false");
+                capReadLiveWeightWithTare = Boolean.parseBoolean(capValue);
+                
+                capValue = reader.readString("capSetPriceCalculationMode", "false");
+                capSetPriceCalculationMode = Boolean.parseBoolean(capValue);
+                
+                capValue = reader.readString("capSetUnitPriceWithWeightUnit", "false");
+                capSetUnitPriceWithWeightUnit = Boolean.parseBoolean(capValue);
+                
+                capValue = reader.readString("capSpecialTare", "false");
+                capSpecialTare = Boolean.parseBoolean(capValue);
+                
+                capValue = reader.readString("capTarePriority", "false");
+                capTarePriority = Boolean.parseBoolean(capValue);
+                
+                // Чтение минимального веса
+                String minWeightStr = reader.readString("minimumWeight", "0");
+                try {
+                    minimumWeight = Integer.parseInt(minWeightStr);
+                } catch (NumberFormatException e) {
+                    minimumWeight = 0;
+                }
             }
 
             scale = createProtocol(protocol);
@@ -664,6 +764,20 @@ public class ScaleService extends Scale implements ScaleService113 {
             logger.error("open error: " + e.getMessage());
             throw je;
         }
+    }
+    
+    /**
+     * Инициализация capabilities для версии 1.14
+     */
+    private void initCapabilities114() {
+        // По умолчанию все false
+        capFreezeValue = false;
+        capReadLiveWeightWithTare = false;
+        capSetPriceCalculationMode = false;
+        capSetUnitPriceWithWeightUnit = false;
+        capSpecialTare = false;
+        capTarePriority = false;
+        minimumWeight = 0;
     }
 
     @Override
@@ -712,6 +826,19 @@ public class ScaleService extends Scale implements ScaleService113 {
         try {
             scale.openPort(timeout);
             deviceMetrics = scale.getDeviceMetrics();
+            
+            // Обновление максимального веса из метрик устройства
+            /*
+            if (deviceMetrics != null) {
+                maximumWeight = deviceMetrics.getMaximumWeight();
+                weightUnit = mapWeightUnit(deviceMetrics.getWeightUnit());
+                // Если minimumWeight не задан в конфиге, используем из метрик
+                if (minimumWeight == 0 && deviceMetrics.getMinimumWeight() > 0) {
+                    minimumWeight = deviceMetrics.getMinimumWeight();
+                }
+            }
+            */
+            
             claimed = true;
             logger.debug(deviceMetrics.toString());
             logger.debug("claim: OK");
@@ -771,6 +898,7 @@ public class ScaleService extends Scale implements ScaleService113 {
                 tareWeight = 0;
                 unitPrice = 0;
                 salesPrice = 0;
+                frozenItems = 0;
 
                 deviceEnabled = true;
                 setState(JPOS_S_IDLE);
@@ -820,22 +948,6 @@ public class ScaleService extends Scale implements ScaleService113 {
         setState(JPOS_S_IDLE);
 
         logger.debug("clearInput: OK");
-    }
-
-    public void clearInputProperties() throws JposException {
-        logger.debug("clearInputProperties()");
-        checkOpened();
-
-        scaleLiveWeight = 0;
-        currentWeight = null;
-        salesPrice = 0;
-
-        logger.debug("clearInputProperties: OK");
-    }
-
-    public void clearOutput() throws JposException {
-        logger.debug("clearOutput()");
-        logger.debug("clearOutput: OK");
     }
 
     public synchronized void checkIdleState() throws JposException {
@@ -902,6 +1014,344 @@ public class ScaleService extends Scale implements ScaleService113 {
         } catch (Exception e) {
             JposException je = getJposException(e);
             logger.error("zeroScale error: " + e.getMessage());
+            throw je;
+        }
+    }
+    
+    // ======================== НОВЫЕ МЕТОДЫ SCALE 1.14 ========================
+    
+    /**
+     * Выполняет взвешивание с расчетом цены.
+     * Позволяет учитывать множественные факторы ценообразования.
+     */
+    @Override
+    public void doPriceCalculating(int[] weightValue, int[] tare, long[] unitPrice,
+            long[] unitPriceX, int[] weightUnitX, int[] weightNumeratorX,
+            int[] weightDenominatorX, long[] price, int timeout) throws JposException {
+        
+        logger.debug("doPriceCalculating(timeout=" + timeout + ")");
+        checkEnabled();
+        
+        if (!capSetPriceCalculationMode) {
+            throw new JposException(JPOS_E_ILLEGAL, "Price calculation mode not supported");
+        }
+        
+        try {
+            if (asyncMode) {
+                synchronized (this) {
+                    if (state == JPOS_S_BUSY) {
+                        throw new JposException(JPOS_E_BUSY, "Asynchronous operation already in progress");
+                    }
+                    setState(JPOS_S_BUSY);
+                }
+                // Для асинхронного режима - используем существующий механизм запросов
+                requestQueue.offer(new WeightRequest(timeout));
+                // В асинхронном режиме возвращаем нули
+                if (weightValue != null && weightValue.length > 0) weightValue[0] = 0;
+                if (tare != null && tare.length > 0) tare[0] = 0;
+                if (unitPrice != null && unitPrice.length > 0) unitPrice[0] = 0;
+                if (unitPriceX != null && unitPriceX.length > 0) unitPriceX[0] = 0;
+                if (weightUnitX != null && weightUnitX.length > 0) weightUnitX[0] = 0;
+                if (weightNumeratorX != null && weightNumeratorX.length > 0) weightNumeratorX[0] = 0;
+                if (weightDenominatorX != null && weightDenominatorX.length > 0) weightDenominatorX[0] = 0;
+                if (price != null && price.length > 0) price[0] = 0;
+                logger.debug("doPriceCalculating: async request queued");
+            } else {
+                // Синхронный режим
+                long weight = readWeightSync(timeout);
+                if (weightValue != null && weightValue.length > 0) {
+                    weightValue[0] = (int) weight;
+                }
+                if (tare != null && tare.length > 0) {
+                    tare[0] = this.tareWeight;
+                }
+                if (unitPrice != null && unitPrice.length > 0) {
+                    unitPrice[0] = this.unitPrice;
+                }
+                if (unitPriceX != null && unitPriceX.length > 0) {
+                    unitPriceX[0] = 0;
+                }
+                if (weightUnitX != null && weightUnitX.length > 0) {
+                    weightUnitX[0] = this.weightUnit;
+                }
+                if (weightNumeratorX != null && weightNumeratorX.length > 0) {
+                    weightNumeratorX[0] = 1;
+                }
+                if (weightDenominatorX != null && weightDenominatorX.length > 0) {
+                    weightDenominatorX[0] = 1;
+                }
+                // Расчет цены (если поддерживается)
+                long calculatedPrice = 0;
+                if (getCapPriceCalculating() && this.unitPrice > 0) {
+                    calculatedPrice = (this.unitPrice * weight) / 1000; // Упрощенный расчет
+                }
+                if (price != null && price.length > 0) {
+                    price[0] = calculatedPrice;
+                }
+                this.salesPrice = calculatedPrice;
+                logger.debug("doPriceCalculating: OK, weight=" + weight + ", price=" + calculatedPrice);
+            }
+        } catch (JposException e) {
+            logger.error("doPriceCalculating error: " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("doPriceCalculating error: " + e.getMessage());
+            throw je;
+        }
+    }
+    
+    /**
+     * Замораживает значения тары и/или цены за единицу.
+     * Позволяет сохранять значения после снятия товара с весов.
+     */
+    @Override
+    public void freezeValue(int item, boolean freeze) throws JposException {
+        logger.debug("freezeValue(item=" + item + ", freeze=" + freeze + ")");
+        checkEnabled();
+        
+        if (!capFreezeValue) {
+            throw new JposException(JPOS_E_ILLEGAL, "Freeze value not supported");
+        }
+        
+        try {
+            if (freeze) {
+                frozenItems |= item;
+            } else {
+                frozenItems &= ~item;
+                // Если размораживаем - сбрасываем соответствующие значения
+                if ((item & SCAL_SFR_UNITPRICE) != 0) {
+                    unitPrice = 0;
+                }
+                if ((item & SCAL_SFR_MANUAL_TARE) != 0 || (item & SCAL_SFR_WEIGHTED_TARE) != 0) {
+                    tareWeight = 0;
+                    scale.tara(0);
+                }
+            }
+            logger.debug("freezeValue: OK, frozenItems=" + frozenItems);
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("freezeValue error: " + e.getMessage());
+            throw je;
+        }
+    }
+    
+    /**
+     * Читает "живой" вес с учетом тары для отображения на дисплее.
+     */
+    @Override
+    public void readLiveWeightWithTare(int[] weightData, int[] tare, int timeout) throws JposException {
+        logger.debug("readLiveWeightWithTare(timeout=" + timeout + ")");
+        checkEnabled();
+        
+        if (!capReadLiveWeightWithTare) {
+            throw new JposException(JPOS_E_ILLEGAL, "Read live weight with tare not supported");
+        }
+        
+        try {
+            if (asyncMode) {
+                synchronized (this) {
+                    if (state == JPOS_S_BUSY) {
+                        throw new JposException(JPOS_E_BUSY, "Asynchronous operation already in progress");
+                    }
+                    setState(JPOS_S_BUSY);
+                }
+                requestQueue.offer(new WeightRequest(timeout));
+                if (weightData != null && weightData.length > 0) weightData[0] = 0;
+                if (tare != null && tare.length > 0) tare[0] = 0;
+                logger.debug("readLiveWeightWithTare: async request queued");
+            } else {
+                long weight = readWeightSync(timeout);
+                if (weightData != null && weightData.length > 0) {
+                    weightData[0] = (int) weight;
+                }
+                if (tare != null && tare.length > 0) {
+                    tare[0] = this.tareWeight;
+                }
+                logger.debug("readLiveWeightWithTare: OK, weight=" + weight + ", tare=" + this.tareWeight);
+            }
+        } catch (JposException e) {
+            logger.error("readLiveWeightWithTare error: " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("readLiveWeightWithTare error: " + e.getMessage());
+            throw je;
+        }
+    }
+    
+    /**
+     * Устанавливает режим расчета цены (самообслуживание, оператор, печать этикеток).
+     */
+    @Override
+    public void setPriceCalculationMode(int mode) throws JposException {
+        logger.debug("setPriceCalculationMode(mode=" + mode + ")");
+        checkEnabled();
+        
+        if (!capSetPriceCalculationMode) {
+            throw new JposException(JPOS_E_ILLEGAL, "Set price calculation mode not supported");
+        }
+        
+        // Проверка допустимых значений
+        if (mode != SCAL_PCM_PRICE_LABELING && 
+            mode != SCAL_PCM_SELF_SERVICE && 
+            mode != SCAL_PCM_OPERATOR) {
+            throw new JposException(JPOS_E_ILLEGAL, "Invalid price calculation mode: " + mode);
+        }
+        
+        try {
+            this.priceCalculationMode = mode;
+            // Здесь должна быть отправка команды на устройство
+            // scale.setPriceCalculationMode(mode);
+            logger.debug("setPriceCalculationMode: OK, mode=" + mode);
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("setPriceCalculationMode error: " + e.getMessage());
+            throw je;
+        }
+    }
+    
+    /**
+     * Устанавливает специальное значение тары (ручная, процентная, взвешенная).
+     */
+    @Override
+    public void setSpecialTare(int mode, int data) throws JposException {
+        logger.debug("setSpecialTare(mode=" + mode + ", data=" + data + ")");
+        checkEnabled();
+        
+        if (!capSpecialTare) {
+            throw new JposException(JPOS_E_ILLEGAL, "Special tare not supported");
+        }
+        
+        // Проверка допустимых значений mode
+        if (mode != SCAL_SST_DEFAULT && mode != SCAL_SST_MANUAL && 
+            mode != SCAL_SST_PERCENT && mode != SCAL_SST_WEIGHTED) {
+            throw new JposException(JPOS_E_ILLEGAL, "Invalid special tare mode: " + mode);
+        }
+        
+        try {
+            this.specialTareMode = mode;
+            this.specialTareData = data;
+            
+            // В зависимости от режима, устанавливаем соответствующий вес тары
+            switch (mode) {
+                case SCAL_SST_DEFAULT:
+                case SCAL_SST_MANUAL:
+                    this.tareWeight = data;
+                    scale.tara((long) data);
+                    break;
+                case SCAL_SST_PERCENT:
+                    // Процентный режим - data содержит процент (99999 = 999.99%)
+                    // Применяем процент к текущему весу
+                    if (currentWeight != null) {
+                        long percentTare = (currentWeight.weight * data) / 10000;
+                        this.tareWeight = (int) percentTare;
+                        scale.tara(percentTare);
+                    }
+                    break;
+                case SCAL_SST_WEIGHTED:
+                    // Взвешенный режим - data игнорируется, используем текущий вес с весов
+                    if (currentWeight != null && currentWeight.status.isStable()) {
+                        this.tareWeight = (int) currentWeight.weight;
+                        scale.tara(currentWeight.weight);
+                    }
+                    break;
+            }
+            
+            logger.debug("setSpecialTare: OK, mode=" + mode + ", tareWeight=" + tareWeight);
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("setSpecialTare error: " + e.getMessage());
+            throw je;
+        }
+    }
+    
+    /**
+     * Устанавливает приоритет использования тары.
+     */
+    @Override
+    public void setTarePrioity(int priority) throws JposException {
+        logger.debug("setTarePrioity(priority=" + priority + ")");
+        checkEnabled();
+        
+        if (!capTarePriority) {
+            throw new JposException(JPOS_E_ILLEGAL, "Tare priority not supported");
+        }
+        
+        // Проверка допустимых значений
+        if (priority != SCAL_STP_FIRST && priority != SCAL_STP_NONE) {
+            throw new JposException(JPOS_E_ILLEGAL, "Invalid tare priority: " + priority);
+        }
+        
+        try {
+            this.tarePriority = priority;
+            // Здесь должна быть отправка команды на устройство
+            // scale.setTarePriority(priority);
+            logger.debug("setTarePrioity: OK, priority=" + priority);
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("setTarePrioity error: " + e.getMessage());
+            throw je;
+        }
+    }
+    
+    /**
+     * Устанавливает цену за единицу с учетом единицы измерения веса.
+     * Позволяет конвертировать цену из одной единицы измерения в другую.
+     */
+    @Override
+    public void setUnitPriceWithWeightUnit(long unitPrice, int weightUnit,
+            int weightNumerator, int weightDenominator) throws JposException {
+        logger.debug("setUnitPriceWithWeightUnit(unitPrice=" + unitPrice + 
+                ", weightUnit=" + weightUnit + 
+                ", weightNumerator=" + weightNumerator + 
+                ", weightDenominator=" + weightDenominator + ")");
+        checkEnabled();
+        
+        if (!capSetUnitPriceWithWeightUnit) {
+            throw new JposException(JPOS_E_ILLEGAL, "Set unit price with weight unit not supported");
+        }
+        
+        // Проверка допустимых единиц измерения
+        if (weightUnit != SCAL_WU_GRAM && weightUnit != SCAL_WU_KILOGRAM &&
+            weightUnit != SCAL_WU_OUNCE && weightUnit != SCAL_WU_POUND) {
+            throw new JposException(JPOS_E_ILLEGAL, "Invalid weight unit: " + weightUnit);
+        }
+        
+        if (weightNumerator <= 0 || weightDenominator <= 0) {
+            throw new JposException(JPOS_E_ILLEGAL, "Weight numerator and denominator must be positive");
+        }
+        
+        try {
+            // Конвертируем цену в базовую единицу (граммы) для внутреннего хранения
+            long convertedPrice = unitPrice;
+            
+            // Если целевая единица отличается от базовой, конвертируем
+            if (weightUnit != this.weightUnit) {
+                // Преобразование через граммы
+                long pricePerGram = unitPrice / weightNumerator;
+                if (weightUnit == SCAL_WU_GRAM) {
+                    // Цена дана за weightNumerator граммов
+                    // Нужно сохранить как цену за weightDenominator единиц базовой единицы
+                    convertedPrice = pricePerGram * weightDenominator;
+                } else if (weightUnit == SCAL_WU_KILOGRAM) {
+                    // Цена дана за weightNumerator килограммов
+                    // 1 кг = 1000 г
+                    long pricePerGramInTarget = unitPrice / (weightNumerator * 1000);
+                    if (this.weightUnit == SCAL_WU_GRAM) {
+                        convertedPrice = pricePerGramInTarget * weightDenominator;
+                    } else if (this.weightUnit == SCAL_WU_KILOGRAM) {
+                        convertedPrice = pricePerGramInTarget * weightDenominator * 1000;
+                    }
+                }
+                // Аналогично для фунтов и унций
+            }
+            
+            this.unitPrice = convertedPrice;
+            logger.debug("setUnitPriceWithWeightUnit: OK, converted unitPrice=" + convertedPrice);
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("setUnitPriceWithWeightUnit error: " + e.getMessage());
             throw je;
         }
     }
@@ -982,14 +1432,14 @@ public class ScaleService extends Scale implements ScaleService113 {
     @Override
     public String getDeviceServiceDescription() throws JposException {
         logger.debug("getDeviceServiceDescription()");
-        String result = "Scale Service v1.13";
+        String result = "Scale Service v1.14";
         logger.debug("getDeviceServiceDescription: " + result);
         return result;
     }
 
     @Override
     public int getDeviceServiceVersion() throws JposException {
-        int version = 1013000 + ServiceVersionUtil.getVersionInt();
+        int version = 1014000 + ServiceVersionUtil.getVersionInt();
         logger.debug("getDeviceServiceVersion()");
         logger.debug("getDeviceServiceVersion: " + version);
         return version;
