@@ -144,6 +144,10 @@ public class ScaleSerial implements IScale, IDevice {
     public void tara(long v) throws Exception {
     }
 
+    public ChannelParams getChannelParams() throws Exception {
+        return null;
+    }
+    
     public DeviceMetrics getDeviceMetrics() throws Exception {
         return null;
     }

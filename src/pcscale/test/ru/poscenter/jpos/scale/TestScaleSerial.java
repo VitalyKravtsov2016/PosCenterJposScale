@@ -1,6 +1,7 @@
 package ru.poscenter.jpos.scale;
 
 import ru.poscenter.scale.DeviceMetrics;
+import ru.poscenter.scale.ChannelParams;
 import ru.poscenter.scale.EScale;
 import ru.poscenter.scale.ScaleWeight;
 import ru.poscenter.scale.ScaleSerial;
@@ -24,6 +25,7 @@ public class TestScaleSerial extends ScaleSerial {
     private ScaleWeight currentWeight;
     private Exception nextException;
     private DeviceMetrics deviceMetrics;
+    private ChannelParams channelParams;
     private EScale type = EScale.Pos2;
     
     // История вызовов для проверок
@@ -38,9 +40,19 @@ public class TestScaleSerial extends ScaleSerial {
         ScaleStatus status = new ScaleStatus(0x10);
         this.currentWeight = new ScaleWeight(0, 0, status);
         this.deviceMetrics = new DeviceMetrics();
+        this.channelParams = new ChannelParams();
     }
     
     // ========== Методы управления для тестов ==========
+    
+    public void setOverweight(boolean overweight) {
+        int statusBits = 0;
+        if (overweight) statusBits |= 0x40;
+        
+        long weight = currentWeight.getWeight();
+        ScaleStatus status = new ScaleStatus(statusBits);
+        this.currentWeight = new ScaleWeight(weight, 0, status);
+    }
     
     public void setCurrentWeight(long weight, boolean stable, boolean overweight) {
         int statusBits = 0;
@@ -65,6 +77,14 @@ public class TestScaleSerial extends ScaleSerial {
     
     public void setDeviceType(EScale type) {
         this.type = type;
+    }
+    
+    public ChannelParams getChannelParams(){
+        return channelParams;
+    }
+    
+    public void setChannelParams(ChannelParams channelParams){
+        this.channelParams = channelParams;
     }
     
     public void setDeviceMetrics(DeviceMetrics metrics) {

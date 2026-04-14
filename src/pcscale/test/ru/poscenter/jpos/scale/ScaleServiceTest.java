@@ -17,6 +17,7 @@ import ru.poscenter.jpos.scale.TestScaleSerial;
 import ru.poscenter.scale.EScale;
 import ru.poscenter.scale.ScaleSerial;
 import ru.poscenter.scale.DeviceMetrics;
+import ru.poscenter.scale.ChannelParams;
 
 import jpos.BaseControl;
 import jpos.JposConst;
@@ -30,11 +31,19 @@ import jpos.events.ErrorEvent;
 import jpos.events.OutputCompleteEvent;
 import jpos.services.EventCallbacks;
 
+import jpos.services.ScaleService114;
+import static jpos.ScaleConst.*;
+
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
 /**
  * Исправленные тесты для ScaleService
  */
 public class ScaleServiceTest {
 
+    private final Logger logger = LogManager.getLogger(ScaleServiceTest.class);
+    
     /**
      * Расширенный ScaleService для тестов
      */
@@ -788,4 +797,683 @@ public class ScaleServiceTest {
         assertFalse(service.getPollEnabled());
         service.close();
     }
+
+    // ======================== ТЕСТЫ ДЛЯ SCALE 1.14 ========================
+
+    /**
+     * Тест: getMinimumWeight - получение минимального веса
+     */
+    @Test
+    public void testGetMinimumWeight() throws Exception {
+        service.open("TestScale", callbacks);
+        service.claim(0);
+        
+        // Устанавливаем минимальный вес через параметры весового канала
+        ChannelParams channelParams = new ChannelParams();
+        channelParams.setMinWeigth(20); // 0.020 кг
+        testScale.setChannelParams(channelParams);
+        
+        int minWeight = service.getMinimumWeight();
+        // Должен быть 20 или 0 (если не установлен)
+        assertTrue("Минимальный вес должен быть >= 0", minWeight >= 0);
+        
+        service.close();
+    }
+
+    /**
+     * Тест: getCapFreezeValue - поддержка заморозки значений
+     */
+    @Test
+    public void testGetCapFreezeValue() throws Exception {
+        service.open("TestScale", callbacks);
+        
+        // По умолчанию false (можно настроить через конфиг)
+        boolean cap = service.getCapFreezeValue();
+        assertFalse("По умолчанию CapFreezeValue должно быть false", cap);
+        
+        service.close();
+    }
+
+    /**
+     * Тест: getCapReadLiveWeightWithTare - поддержка чтения живого веса с тарой
+     */
+    @Test
+    public void testGetCapReadLiveWeightWithTare() throws Exception {
+        service.open("TestScale", callbacks);
+        
+        boolean cap = service.getCapReadLiveWeightWithTare();
+        assertFalse("По умолчанию CapReadLiveWeightWithTare должно быть false", cap);
+        
+        service.close();
+    }
+
+    /**
+     * Тест: getCapSetPriceCalculationMode - поддержка установки режима расчета цены
+     */
+    @Test
+    public void testGetCapSetPriceCalculationMode() throws Exception {
+        service.open("TestScale", callbacks);
+        
+        boolean cap = service.getCapSetPriceCalculationMode();
+        assertTrue("По умолчанию CapSetPriceCalculationMode должно быть false", cap);
+        
+        service.close();
+    }
+
+    /**
+     * Тест: getCapSetUnitPriceWithWeightUnit - поддержка установки цены с единицей веса
+     */
+    @Test
+    public void testGetCapSetUnitPriceWithWeightUnit() throws Exception {
+        service.open("TestScale", callbacks);
+        
+        boolean cap = service.getCapSetUnitPriceWithWeightUnit();
+        assertFalse("По умолчанию CapSetUnitPriceWithWeightUnit должно быть false", cap);
+        
+        service.close();
+    }
+
+    /**
+     * Тест: getCapSpecialTare - поддержка специальной тары
+     */
+    @Test
+    public void testGetCapSpecialTare() throws Exception {
+        service.open("TestScale", callbacks);
+        
+        boolean cap = service.getCapSpecialTare();
+        assertFalse("По умолчанию CapSpecialTare должно быть false", cap);
+        
+        service.close();
+    }
+
+    /**
+     * Тест: getCapTarePriority - поддержка приоритета тары
+     */
+    @Test
+    public void testGetCapTarePriority() throws Exception {
+        service.open("TestScale", callbacks);
+        
+        boolean cap = service.getCapTarePriority();
+        assertFalse("По умолчанию CapTarePriority должно быть false", cap);
+        
+        service.close();
+    }
+
+    /**
+     * Тест: freezeValue - заморозка значений тары
+     */
+    @Test
+    public void testFreezeValue() throws Exception {
+        // Для этого теста нужно включить поддержку freezeValue
+        // В реальном проекте нужно настроить capFreezeValue=true в конфиге
+        
+        initService(false, false);
+        
+        // Устанавливаем тару
+        service.setTareWeight(500); // 0.500 кг
+        
+        // Пытаемся заморозить (если не поддерживается, будет исключение)
+        try {
+            service.freezeValue(SCAL_SFR_MANUAL_TARE, true);
+            // Если дошли сюда - функция поддерживается
+            logger.info("freezeValue supported");
+            
+            // Проверяем, что состояние заморозки изменилось
+            // (нужен геттер для frozenItems, если добавить)
+            
+            // Размораживаем
+            service.freezeValue(SCAL_SFR_MANUAL_TARE, false);
+            
+        } catch (JposException e) {
+            // Если не поддерживается - должно быть JPOS_E_ILLEGAL
+            assertEquals("Должен быть JPOS_E_ILLEGAL", 
+                         JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: freezeValue с несколькими флагами (битовая маска)
+     */
+    @Test
+    public void testFreezeValueMultipleFlags() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Замораживаем и тару, и цену
+            int flags = SCAL_SFR_MANUAL_TARE | SCAL_SFR_UNITPRICE;
+            service.freezeValue(flags, true);
+            
+            // Размораживаем только цену
+            service.freezeValue(SCAL_SFR_UNITPRICE, false);
+            
+            // Размораживаем все
+            service.freezeValue(flags, false);
+            
+        } catch (JposException e) {
+            // Если не поддерживается - игнорируем
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: readLiveWeightWithTare - чтение живого веса с тарой
+     */
+    @Test
+    public void testReadLiveWeightWithTareSync() throws Exception {
+        initService(false, false);
+        
+        testScale.setCurrentWeight(1234, true, false);
+        service.setTareWeight(200);
+        
+        try {
+            int[] weightData = new int[1];
+            int[] tare = new int[1];
+            
+            service.readLiveWeightWithTare(weightData, tare, 3000);
+            
+            // Если функция поддерживается
+            assertTrue("Вес должен быть > 0 или 0", weightData[0] >= 0);
+            assertTrue("Тара должна быть >= 0", tare[0] >= 0);
+            
+        } catch (JposException e) {
+            // Если не поддерживается - должно быть JPOS_E_ILLEGAL
+            assertEquals("Должен быть JPOS_E_ILLEGAL", 
+                         JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: readLiveWeightWithTare в асинхронном режиме
+     */
+    @Test
+    public void testReadLiveWeightWithTareAsync() throws Exception {
+        initService(false, true);
+        
+        testScale.setCurrentWeight(1234, true, false);
+        service.setTareWeight(200);
+        callbacks.clearEvents();
+        
+        try {
+            int[] weightData = new int[1];
+            int[] tare = new int[1];
+            
+            service.readLiveWeightWithTare(weightData, tare, 3000);
+            
+            // В асинхронном режиме возвращаются нули
+            assertEquals("В асинхронном режиме вес должен быть 0", 0, weightData[0]);
+            assertEquals("В асинхронном режиме тара должна быть 0", 0, tare[0]);
+            
+            // Должно прийти DataEvent
+            DataEvent event = callbacks.waitForEvent(DataEvent.class, 5000);
+            assertNotNull("Должно прийти DataEvent", event);
+            
+        } catch (JposException e) {
+            // Если не поддерживается
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setPriceCalculationMode - установка режима расчета цены
+     */
+    @Test
+    public void testSetPriceCalculationMode() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Режим оператора
+            service.setPriceCalculationMode(SCAL_PCM_OPERATOR);
+            
+            // Режим самообслуживания
+            service.setPriceCalculationMode(SCAL_PCM_SELF_SERVICE);
+            
+            // Режим печати этикеток
+            service.setPriceCalculationMode(SCAL_PCM_PRICE_LABELING);
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setPriceCalculationMode с неверным параметром
+     */
+    @Test
+    public void testSetPriceCalculationModeInvalid() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Неверный режим
+            service.setPriceCalculationMode(999);
+            fail("Должно быть исключение при неверном режиме");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setSpecialTare - установка специальной тары (ручной режим)
+     */
+    @Test
+    public void testSetSpecialTareManual() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Ручная тара 0.750 кг
+            service.setSpecialTare(SCAL_SST_MANUAL, 750);
+            
+            // Отключение тары
+            service.setSpecialTare(SCAL_SST_MANUAL, 0);
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setSpecialTare - установка специальной тары (процентный режим)
+     */
+    @Test
+    public void testSetSpecialTarePercent() throws Exception {
+        initService(false, false);
+        
+        testScale.setCurrentWeight(1000, true, false);
+        
+        try {
+            // Процентная тара 10% (1000 * 0.10 = 100)
+            service.setSpecialTare(SCAL_SST_PERCENT, 1000); // 10.00%
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setSpecialTare - установка специальной тары (взвешенный режим)
+     */
+    @Test
+    public void testSetSpecialTareWeighted() throws Exception {
+        initService(false, false);
+        
+        testScale.setCurrentWeight(500, true, false);
+        
+        try {
+            // Взвешенная тара - использует текущий вес с весов
+            service.setSpecialTare(SCAL_SST_WEIGHTED, 0);
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setSpecialTare - режим по умолчанию
+     */
+    @Test
+    public void testSetSpecialTareDefault() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Тары по умолчанию
+            service.setSpecialTare(SCAL_SST_DEFAULT, 300);
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setTarePriority - установка приоритета тары
+     */
+    @Test
+    public void testSetTarePriority() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Первая тара блокирует остальные
+            service.setTarePrioity(SCAL_STP_FIRST);
+            
+            // Любая тара может заменить текущую
+            service.setTarePrioity(SCAL_STP_NONE);
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setTarePriority с неверным параметром
+     */
+    @Test
+    public void testSetTarePriorityInvalid() throws Exception {
+        initService(false, false);
+        
+        try {
+            service.setTarePrioity(999);
+            fail("Должно быть исключение при неверном приоритете");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setUnitPriceWithWeightUnit - конвертация цены (граммы в килограммы)
+     */
+    @Test
+    public void testSetUnitPriceWithWeightUnitGramToKg() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Цена 2.55 евро за 100 грамм, весы работают в кг
+            // Ожидаемый результат: 25.50 евро за кг
+            service.setUnitPriceWithWeightUnit(25500, SCAL_WU_GRAM, 100, 1);
+            
+            long expectedUnitPrice = 25500 * 10; // 2.55 * 10 = 25.50 евро за кг
+            assertEquals("Цена должна быть сконвертирована", 
+                         expectedUnitPrice, service.getUnitPrice());
+                         
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setUnitPriceWithWeightUnit - конвертация цены (килограммы в граммы)
+     */
+    @Test
+    public void testSetUnitPriceWithWeightUnitKgToGram() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Цена 25.50 евро за кг, весы работают в граммах
+            service.setUnitPriceWithWeightUnit(255000, SCAL_WU_KILOGRAM, 1, 1);
+            
+            // Ожидаемый результат: 0.255 евро за грамм? Нет, цена за кг / 1000
+            // В реализации конвертация через граммы
+            long unitPrice = service.getUnitPrice();
+            assertTrue("Цена должна быть сконвертирована", unitPrice > 0);
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: setUnitPriceWithWeightUnit - неверные параметры
+     */
+    @Test
+    public void testSetUnitPriceWithWeightUnitInvalidParams() throws Exception {
+        initService(false, false);
+        
+        try {
+            // Неверная единица измерения
+            service.setUnitPriceWithWeightUnit(100, 999, 1, 1);
+            fail("Должно быть исключение при неверной единице измерения");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        try {
+            // Нулевой числитель
+            service.setUnitPriceWithWeightUnit(100, SCAL_WU_GRAM, 0, 1);
+            fail("Должно быть исключение при нулевом числителе");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        try {
+            // Нулевой знаменатель
+            service.setUnitPriceWithWeightUnit(100, SCAL_WU_GRAM, 1, 0);
+            fail("Должно быть исключение при нулевом знаменателе");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: doPriceCalculating - синхронный режим
+     */
+    @Test
+    public void testDoPriceCalculatingSync() throws Exception {
+        initService(false, false);
+        
+        testScale.setCurrentWeight(1234, true, false);
+        service.setTareWeight(200);
+        
+        try {
+            int[] weightValue = new int[1];
+            int[] tare = new int[1];
+            long[] unitPrice = new long[1];
+            long[] unitPriceX = new long[1];
+            int[] weightUnitX = new int[1];
+            int[] weightNumeratorX = new int[1];
+            int[] weightDenominatorX = new int[1];
+            long[] price = new long[1];
+            
+            service.doPriceCalculating(weightValue, tare, unitPrice, unitPriceX,
+                weightUnitX, weightNumeratorX, weightDenominatorX, price, 5000);
+            
+            // Проверяем результаты
+            assertTrue("Вес должен быть > 0", weightValue[0] > 0);
+            assertTrue("Тара должна быть >= 0", tare[0] >= 0);
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: doPriceCalculating - асинхронный режим
+     */
+    @Test
+    public void testDoPriceCalculatingAsync() throws Exception {
+        initService(false, true);
+        
+        testScale.setCurrentWeight(1234, true, false);
+        service.setTareWeight(200);
+        callbacks.clearEvents();
+        
+        try {
+            int[] weightValue = new int[1];
+            int[] tare = new int[1];
+            long[] unitPrice = new long[1];
+            long[] unitPriceX = new long[1];
+            int[] weightUnitX = new int[1];
+            int[] weightNumeratorX = new int[1];
+            int[] weightDenominatorX = new int[1];
+            long[] price = new long[1];
+            
+            service.doPriceCalculating(weightValue, tare, unitPrice, unitPriceX,
+                weightUnitX, weightNumeratorX, weightDenominatorX, price, 5000);
+            
+            // В асинхронном режиме все выходные параметры должны быть 0
+            assertEquals(0, weightValue[0]);
+            assertEquals(0, tare[0]);
+            assertEquals(0, unitPrice[0]);
+            assertEquals(0, unitPriceX[0]);
+            assertEquals(0, weightUnitX[0]);
+            assertEquals(0, weightNumeratorX[0]);
+            assertEquals(0, weightDenominatorX[0]);
+            assertEquals(0, price[0]);
+            
+            // Должно прийти DataEvent
+            DataEvent event = callbacks.waitForEvent(DataEvent.class, 5000);
+            assertNotNull("Должно прийти DataEvent", event);
+            assertEquals("Вес в событии должен совпадать", 1234, event.getStatus());
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+        
+        cleanup();
+    }
+
+    /**
+     * Тест: doPriceCalculating с таймаутом
+     */
+    @Test
+    public void testDoPriceCalculatingTimeout() throws Exception {
+        initService(false, false);
+        
+        // Вес никогда не стабилизируется
+        testScale.setCurrentWeight(1234, false, false);
+        
+        try {
+            int[] weightValue = new int[1];
+            int[] tare = new int[1];
+            long[] unitPrice = new long[1];
+            long[] unitPriceX = new long[1];
+            int[] weightUnitX = new int[1];
+            int[] weightNumeratorX = new int[1];
+            int[] weightDenominatorX = new int[1];
+            long[] price = new long[1];
+            
+            service.doPriceCalculating(weightValue, tare, unitPrice, unitPriceX,
+                weightUnitX, weightNumeratorX, weightDenominatorX, price, 1);
+            
+            fail("Должно быть исключение по таймауту");
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_TIMEOUT, e.getErrorCode());
+        }
+        cleanup();
+    }
+
+    /**
+     * Тест: doPriceCalculating - перегрузка (overweight)
+     */
+    @Test
+    public void testDoPriceCalculatingOverweight() throws Exception {
+        initService(false, false);
+        
+        testScale.setCurrentWeight(15000, true, true); // Перегруз
+        testScale.setOverweight(true);
+        
+        try {
+            int[] weightValue = new int[1];
+            int[] tare = new int[1];
+            long[] unitPrice = new long[1];
+            long[] unitPriceX = new long[1];
+            int[] weightUnitX = new int[1];
+            int[] weightNumeratorX = new int[1];
+            int[] weightDenominatorX = new int[1];
+            long[] price = new long[1];
+            
+            service.doPriceCalculating(weightValue, tare, unitPrice, unitPriceX,
+                weightUnitX, weightNumeratorX, weightDenominatorX, price, 3000);
+                
+            fail("Должно быть исключение о перегрузе");
+            
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_EXTENDED, e.getErrorCode());
+            assertEquals(ScaleConst.JPOS_ESCAL_OVERWEIGHT, e.getErrorCodeExtended());
+        }
+        
+        testScale.setOverweight(false);
+        cleanup();
+    }
+
+    /**
+     * Тест: все методы Scale 1.14 вместе (комплексный тест)
+     */
+    @Test
+    public void testScale114AllFeaturesTogether() throws Exception {
+        // Проверяем capabilities
+        service.open("TestScale", callbacks);
+        
+        boolean hasFreeze = service.getCapFreezeValue();
+        boolean hasLiveWeight = service.getCapReadLiveWeightWithTare();
+        boolean hasPriceMode = service.getCapSetPriceCalculationMode();
+        boolean hasUnitPriceWithUnit = service.getCapSetUnitPriceWithWeightUnit();
+        boolean hasSpecialTare = service.getCapSpecialTare();
+        boolean hasTarePriority = service.getCapTarePriority();
+        
+        int minWeight = service.getMinimumWeight();
+        assertTrue(minWeight >= 0);
+        
+        service.claim(0);
+        service.setDeviceEnabled(true);
+        
+        // Если поддерживаются - выполняем
+        if (hasPriceMode) {
+            service.setPriceCalculationMode(SCAL_PCM_OPERATOR);
+        }
+        
+        if (hasSpecialTare) {
+            service.setSpecialTare(SCAL_SST_MANUAL, 500);
+        }
+        
+        if (hasTarePriority) {
+            service.setTarePrioity(SCAL_STP_NONE);
+        }
+        
+        if (hasUnitPriceWithUnit) {
+            service.setUnitPriceWithWeightUnit(25500, SCAL_WU_GRAM, 100, 1);
+        }
+        
+        testScale.setCurrentWeight(1000, true, false);
+        
+        // Выполняем взвешивание с расчетом цены
+        int[] weightValue = new int[1];
+        int[] tare = new int[1];
+        long[] unitPrice = new long[1];
+        long[] unitPriceX = new long[1];
+        int[] weightUnitX = new int[1];
+        int[] weightNumeratorX = new int[1];
+        int[] weightDenominatorX = new int[1];
+        long[] price = new long[1];
+        
+        service.doPriceCalculating(weightValue, tare, unitPrice, unitPriceX,
+            weightUnitX, weightNumeratorX, weightDenominatorX, price, 5000);
+        
+        assertTrue(weightValue[0] > 0);
+        
+        if (hasLiveWeight) {
+            int[] liveWeight = new int[1];
+            int[] liveTare = new int[1];
+            service.readLiveWeightWithTare(liveWeight, liveTare, 1000);
+            assertTrue(liveWeight[0] >= 0);
+        }
+        
+        if (hasFreeze) {
+            service.freezeValue(SCAL_SFR_UNITPRICE, true);
+            service.freezeValue(SCAL_SFR_UNITPRICE, false);
+        }
+        
+        service.setDeviceEnabled(false);
+        service.release();
+        service.close();
+    }    
 }

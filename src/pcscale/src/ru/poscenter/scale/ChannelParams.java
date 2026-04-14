@@ -87,6 +87,76 @@ public class ChannelParams
 	  text += String.format("Количество градуировочных точек: %d", pointCount);
 	  return text;
 	}
+
+    /**
+     * @param flags the flags to set
+     */
+    public void setFlags(int flags) {
+        this.flags = flags;
+    }
+
+    /**
+     * @param decimalPoint the decimalPoint to set
+     */
+    public void setDecimalPoint(byte decimalPoint) {
+        this.decimalPoint = decimalPoint;
+    }
+
+    /**
+     * @param power the power to set
+     */
+    public void setPower(byte power) {
+        this.power = power;
+    }
+
+    /**
+     * @param maxWeigth the maxWeigth to set
+     */
+    public void setMaxWeigth(int maxWeigth) {
+        this.maxWeigth = maxWeigth;
+    }
+
+    /**
+     * @param minWeigth the minWeigth to set
+     */
+    public void setMinWeigth(int minWeigth) {
+        this.minWeigth = minWeigth;
+    }
+
+    /**
+     * @param maxTare the maxTare to set
+     */
+    public void setMaxTare(int maxTare) {
+        this.maxTare = maxTare;
+    }
+
+    /**
+     * @param range the range to set
+     */
+    public void setRange(int[] range) {
+        this.range = range;
+    }
+
+    /**
+     * @param resolution the resolution to set
+     */
+    public void setResolution(int[] resolution) {
+        this.resolution = resolution;
+    }
+
+    /**
+     * @param pointCount the pointCount to set
+     */
+    public void setPointCount(int pointCount) {
+        this.pointCount = pointCount;
+    }
+
+    /**
+     * @param calibCount the calibCount to set
+     */
+    public void setCalibCount(int calibCount) {
+        this.calibCount = calibCount;
+    }
 	
 	public class ScaleChannelFlags
 	{

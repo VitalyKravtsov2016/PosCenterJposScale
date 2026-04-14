@@ -39,6 +39,7 @@ import jpos.events.OutputCompleteEvent;
 import jpos.events.StatusUpdateEvent;
 import jpos.services.EventCallbacks;
 import jpos.services.ScaleService114;
+import ru.poscenter.scale.ChannelParams;
 
 /**
  * Реализация сервиса весов для JPOS 1.14 с полным логированием
@@ -79,7 +80,8 @@ public class ScaleService extends Scale implements ScaleService114 {
     // Состояние устройства
     private int state = JPOS_S_CLOSED;
     private ScaleSerial scale = null;
-    private DeviceMetrics deviceMetrics;
+    private DeviceMetrics deviceMetrics = null;
+    private ChannelParams channelParams = null;
     private ScaleWeight currentWeight = null;
     private long scaleLiveWeight = 0;
     private int maximumWeight = 0;
@@ -773,7 +775,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         // По умолчанию все false
         capFreezeValue = false;
         capReadLiveWeightWithTare = false;
-        capSetPriceCalculationMode = false;
+        capSetPriceCalculationMode = true;
         capSetUnitPriceWithWeightUnit = false;
         capSpecialTare = false;
         capTarePriority = false;
@@ -826,6 +828,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         try {
             scale.openPort(timeout);
             deviceMetrics = scale.getDeviceMetrics();
+            channelParams = scale.getChannelParams();
             
             // Обновление максимального веса из метрик устройства
             /*

@@ -2,9 +2,9 @@ package ru.poscenter.scale;
 
 public class ScaleWeight {
 
-    public final long weight;
-    public final long tare;
-    public final ScaleStatus status;
+    public long weight;
+    public long tare;
+    public ScaleStatus status;
 
     public ScaleWeight(long weight, long tare, ScaleStatus status) {
         this.weight = weight;

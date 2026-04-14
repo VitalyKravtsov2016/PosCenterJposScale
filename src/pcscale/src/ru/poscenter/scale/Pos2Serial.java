@@ -95,6 +95,10 @@ public class Pos2Serial extends ScaleSerial {
         
         int readTimeout = params.getInt(IDevice.PARAM_READ_TIMEOUT);
         getProtocol().setByteTimeout(readTimeout);
+        
+        readDeviceMetrics();
+        readChannelNumber();
+        readChannelParams(channelNumber);
     }
 
     // ==================== НОВЫЕ КОМАНДЫ ====================
@@ -392,12 +396,12 @@ public class Pos2Serial extends ScaleSerial {
         ScaleCommand command = createCommand(CMD_READ_CHANNEL_PARAMS);
         command.write(index, 1);
         execute(command);
-        channelParams.flags = reply.readShort();
-        channelParams.decimalPoint = (byte) reply.readByte();
-        channelParams.power = (byte) reply.readByte();
-        channelParams.maxWeigth = reply.readShort();
-        channelParams.minWeigth = reply.readShort();
-        channelParams.maxTare = reply.readShort();
+        channelParams.setFlags(reply.readShort());
+        channelParams.setDecimalPoint((byte) reply.readByte());
+        channelParams.setPower((byte) reply.readByte());
+        channelParams.setMaxWeigth(reply.readShort());
+        channelParams.setMinWeigth(reply.readShort());
+        channelParams.setMaxTare(reply.readShort());
         channelParams.range[0] = 0;
         channelParams.range[1] = reply.readShort();
         channelParams.range[2] = reply.readShort();
@@ -406,8 +410,8 @@ public class Pos2Serial extends ScaleSerial {
         channelParams.resolution[1] = reply.readByte();
         channelParams.resolution[2] = reply.readByte();
         channelParams.resolution[3] = reply.readByte();
-        channelParams.pointCount = reply.readByte();
-        channelParams.calibCount = reply.readByte();
+        channelParams.setPointCount(reply.readByte());
+        channelParams.setCalibCount(reply.readByte());
     }
 
     public DeviceMetrics getDeviceMetrics() {

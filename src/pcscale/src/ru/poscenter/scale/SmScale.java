@@ -233,12 +233,12 @@ public class SmScale {
         if (testMode) 
         {
             ChannelParams channelParams = new ChannelParams();
-            channelParams.flags = 0;
-            channelParams.decimalPoint = 2;
-            channelParams.power = 0;
-            channelParams.maxWeigth = 15000;
-            channelParams.minWeigth = 40;
-            channelParams.maxTare = 12000;
+            channelParams.setFlags(0);
+            channelParams.setDecimalPoint((byte) 2);
+            channelParams.setPower((byte) 0);
+            channelParams.setMaxWeigth(15000);
+            channelParams.setMinWeigth(40);
+            channelParams.setMaxTare(12000);
             channelParams.range[0] = 0;
             channelParams.range[1] = 0;
             channelParams.range[2] = 0;
@@ -247,8 +247,8 @@ public class SmScale {
             channelParams.resolution[1] = 0;
             channelParams.resolution[2] = 0;
             channelParams.resolution[3] = 0;
-            channelParams.pointCount = 5;
-            channelParams.calibCount = 5;
+            channelParams.setPointCount(5);
+            channelParams.setCalibCount(5);
             return channelParams;
         }
         return protocol.getChannelParams();
