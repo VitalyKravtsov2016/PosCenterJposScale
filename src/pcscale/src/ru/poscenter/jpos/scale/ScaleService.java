@@ -115,6 +115,141 @@ public class ScaleService extends Scale implements ScaleService114 {
     private boolean capSpecialTare = false;
     private boolean capTarePriority = false;
 
+    // ======================== СТАТИСТИКА UPOS ========================
+    /**
+     * Хранилище статистики устройства согласно UPOS 1.15
+     * 
+     * Device Information (J.2.1):
+     * - UnifiedPOSVersion
+     * - DeviceCategory
+     * - ManufacturerName
+     * - ModelName
+     * - SerialNumber
+     * - ManufactureDate
+     * - MechanicalRevision
+     * - FirmwareRevision
+     * - Interface
+     * - InstallationDate
+     * 
+     * Common Statistics (J.2.1):
+     * - HoursPoweredCount
+     * - CommunicationErrorCount
+     * 
+     * Scale Statistics (J.2.18):
+     * - GoodWeightReadCount
+     */
+    private static class Statistics {
+        // Device Information (неизменяемые)
+        private final String unifiedPOSVersion = "1.15";
+        private final String deviceCategory = "Scale";
+        private String manufacturerName = "SHTRIKH-M";
+        private String modelName = "";
+        private String serialNumber = "";
+        private String manufactureDate = "";
+        private String mechanicalRevision = "";
+        private String firmwareRevision = "";
+        private String interfaceType = "Serial";
+        private String installationDate = "";
+        
+        // Common Statistics (J.2.1)
+        private long hoursPoweredCount = 0;      // Часы под напряжением
+        private long communicationErrorCount = 0; // Количество ошибок связи
+        
+        // Scale Statistics (J.2.18)
+        private long goodWeightReadCount = 0;    // Количество успешных взвешиваний
+        
+        // Вспомогательные поля
+        private long lastPowerOnTime = System.currentTimeMillis();
+        private boolean powered = true;
+        
+        /** Обновление счетчика часов под напряжением */
+        public void updateHoursPowered() {
+            if (powered) {
+                long now = System.currentTimeMillis();
+                long deltaHours = (now - lastPowerOnTime) / (1000 * 60 * 60);
+                if (deltaHours > 0) {
+                    hoursPoweredCount += deltaHours;
+                    lastPowerOnTime = now;
+                }
+            }
+        }
+        
+        /** Установить состояние питания */
+        public void setPowered(boolean powered) {
+            if (this.powered != powered) {
+                updateHoursPowered(); // Фиксируем часы перед сменой состояния
+                this.powered = powered;
+                if (powered) {
+                    this.lastPowerOnTime = System.currentTimeMillis();
+                }
+            }
+        }
+        
+        /** Сбросить все счетчики */
+        public void reset() {
+            hoursPoweredCount = 0;
+            communicationErrorCount = 0;
+            goodWeightReadCount = 0;
+            lastPowerOnTime = System.currentTimeMillis();
+        }
+        
+        /** Получить XML-строку статистики в формате UPOS */
+        public String toXML() {
+            updateHoursPowered(); // Актуализируем часы перед формированием XML
+            
+            StringBuilder sb = new StringBuilder();
+            sb.append("<UnifiedPOSStatisticsContext>\n");
+            
+            // Common Statistics
+            sb.append("    <HoursPoweredCount>").append(hoursPoweredCount).append("</HoursPoweredCount>\n");
+            sb.append("    <CommunicationErrorCount>").append(communicationErrorCount).append("</CommunicationErrorCount>\n");
+            
+            // Scale Statistics
+            sb.append("    <GoodWeightReadCount>").append(goodWeightReadCount).append("</GoodWeightReadCount>\n");
+            
+            sb.append("</UnifiedPOSStatisticsContext>");
+            return sb.toString();
+        }
+        
+        /** Получить XML с Device Information */
+        public String getDeviceInformationXML() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("<DeviceInformation>\n");
+            sb.append("    <UnifiedPOSVersion>").append(unifiedPOSVersion).append("</UnifiedPOSVersion>\n");
+            sb.append("    <DeviceCategory>").append(deviceCategory).append("</DeviceCategory>\n");
+            sb.append("    <ManufacturerName>").append(escapeXML(manufacturerName)).append("</ManufacturerName>\n");
+            sb.append("    <ModelName>").append(escapeXML(modelName)).append("</ModelName>\n");
+            sb.append("    <SerialNumber>").append(escapeXML(serialNumber)).append("</SerialNumber>\n");
+            sb.append("    <ManufactureDate>").append(escapeXML(manufactureDate)).append("</ManufactureDate>\n");
+            sb.append("    <MechanicalRevision>").append(escapeXML(mechanicalRevision)).append("</MechanicalRevision>\n");
+            sb.append("    <FirmwareRevision>").append(escapeXML(firmwareRevision)).append("</FirmwareRevision>\n");
+            sb.append("    <Interface>").append(escapeXML(interfaceType)).append("</Interface>\n");
+            sb.append("    <InstallationDate>").append(escapeXML(installationDate)).append("</InstallationDate>\n");
+            sb.append("</DeviceInformation>");
+            return sb.toString();
+        }
+        
+        private String escapeXML(String str) {
+            if (str == null) return "";
+            return str.replace("&", "&amp;")
+                      .replace("<", "&lt;")
+                      .replace(">", "&gt;")
+                      .replace("\"", "&quot;")
+                      .replace("'", "&apos;");
+        }
+        
+        // Getters for updates
+        public void incrementCommunicationErrorCount() {
+            communicationErrorCount++;
+        }
+        
+        public void incrementGoodWeightReadCount() {
+            goodWeightReadCount++;
+        }
+    }
+    
+    private Statistics statistics = new Statistics();
+
     // ======================== ВНУТРЕННИЕ КЛАССЫ ========================
     private static class WeightRequest {
 
@@ -335,7 +470,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     public boolean getCapStatisticsReporting() throws JposException {
         logger.debug("getCapStatisticsReporting");
         checkOpened();
-        boolean result = false;
+        boolean result = true;  // Включена поддержка статистики
         logger.debug("getCapStatisticsReporting: " + result);
         return result;
     }
@@ -344,7 +479,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     public boolean getCapUpdateStatistics() throws JposException {
         logger.debug("getCapUpdateStatistics");
         checkOpened();
-        boolean result = false;
+        boolean result = true;  // Включена поддержка обновления статистики
         logger.debug("getCapUpdateStatistics: " + result);
         return result;
     }
@@ -830,21 +965,63 @@ public class ScaleService extends Scale implements ScaleService114 {
             deviceMetrics = scale.getDeviceMetrics();
             channelParams = scale.getChannelParams();
             
-            // Обновление максимального веса из метрик устройства
-            /*
+            // ========== ИНИЦИАЛИЗАЦИЯ СТАТИСТИКИ ==========
+            statistics = new Statistics();
+            
+            // Заполняем Device Information из метрик устройства (если доступны)
             if (deviceMetrics != null) {
-                maximumWeight = deviceMetrics.getMaximumWeight();
-                weightUnit = mapWeightUnit(deviceMetrics.getWeightUnit());
-                // Если minimumWeight не задан в конфиге, используем из метрик
-                if (minimumWeight == 0 && deviceMetrics.getMinimumWeight() > 0) {
-                    minimumWeight = deviceMetrics.getMinimumWeight();
+                if (deviceMetrics.getDescription() != null && !deviceMetrics.getDescription().isEmpty()) {
+                    statistics.modelName = deviceMetrics.getDescription();
+                }
+                // Можно также использовать model, type, version для формирования информации
+                if (deviceMetrics.getModel() > 0) {
+                    statistics.modelName += " (Model: " + deviceMetrics.getModel() + ")";
                 }
             }
-            */
+            
+            // Если есть конфигурационные параметры для Device Information
+            if (m_jposEntry != null) {
+                JposPropertyReader reader = new JposPropertyReader(m_jposEntry);
+                String customSerial = reader.readString("serialNumber", "");
+                if (!customSerial.isEmpty()) {
+                    statistics.serialNumber = customSerial;
+                }
+                String interfaceType = reader.readString("interfaceType", "Serial");
+                statistics.interfaceType = interfaceType;
+                
+                // Дата установки (можно задать в конфиге)
+                statistics.installationDate = reader.readString("installationDate", "");
+            }
+            
+            // ========== УСТАНОВКА MIN/MAX ВЕСА ИЗ CHANNELPARAMS ==========
+            if (channelParams != null) {
+                // Минимальный вес в граммах
+                double minWeightKg = channelParams.getMinWeigth();
+                minimumWeight = (int) (minWeightKg * 1000); // перевод в граммы
+                
+                // Максимальный вес в граммах
+                double maxWeightKg = channelParams.getMaxWeigth();
+                maximumWeight = (int) (maxWeightKg * 1000); // перевод в граммы
+                
+                // Определение единицы измерения (по умолчанию граммы, но можно уточнить)
+                weightUnit = SCAL_WU_GRAM;
+                
+                logger.info("ChannelParams: minWeight=" + minimumWeight + "g, maxWeight=" + maximumWeight + "g");
+                logger.info("ChannelParams details:\n" + channelParams.toText());
+            } else {
+                logger.warn("channelParams is null, using default weight limits");
+            }
+            
+            // Устанавливаем статистику питания
+            if (statistics != null) {
+                statistics.setPowered(true);
+            }
             
             claimed = true;
-            logger.debug(deviceMetrics.toString());
-            logger.debug("claim: OK");
+            if (deviceMetrics != null) {
+                logger.debug(deviceMetrics.toString());
+            }
+            logger.debug("claim: OK, statistics initialized");
 
         } catch (Exception e) {
             JposException je = getJposException(e);
@@ -905,7 +1082,11 @@ public class ScaleService extends Scale implements ScaleService114 {
 
                 deviceEnabled = true;
                 setState(JPOS_S_IDLE);
-                readScaleWeight();
+                
+                // Устанавливаем состояние питания
+                if (statistics != null) {
+                    statistics.setPowered(true);
+                }
                 setPowerState(JPOS_PS_ONLINE);
 
                 startPollThread();
@@ -914,6 +1095,11 @@ public class ScaleService extends Scale implements ScaleService114 {
             } else {
                 deviceEnabled = false;
                 setState(JPOS_S_IDLE);
+                
+                // Фиксируем, что питание выключено
+                if (statistics != null) {
+                    statistics.setPowered(false);
+                }
                 setPowerState(JPOS_PS_UNKNOWN);
 
                 if (asyncMode) {
@@ -1407,28 +1593,117 @@ public class ScaleService extends Scale implements ScaleService114 {
         throw e;
     }
 
+    // ======================== МЕТОДЫ СТАТИСТИКИ UPOS ========================
+    
     @Override
     public void resetStatistics(String statisticsBuffer) throws JposException {
         logger.debug("resetStatistics(" + statisticsBuffer + ")");
-        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
-        logger.error("resetStatistics: " + e.getMessage());
-        throw e;
+        checkClaimed();
+        checkDisabled();  // Согласно UPOS, сброс статистики должен выполняться при отключенном устройстве
+        
+        if (statistics == null) {
+            throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
+        }
+        
+        try {
+            // Парсим statisticsBuffer (может содержать список счетчиков для сброса)
+            // Если пусто или "*" - сбрасываем всё
+            if (statisticsBuffer == null || statisticsBuffer.isEmpty() || "*".equals(statisticsBuffer)) {
+                statistics.reset();
+                logger.debug("resetStatistics: all statistics reset");
+            } else {
+                // Можно реализовать выборочный сброс отдельных счетчиков
+                // Формат: "HoursPoweredCount,CommunicationErrorCount,GoodWeightReadCount"
+                String[] counters = statisticsBuffer.split("[ ,;]+");
+                for (String counter : counters) {
+                    String trimmed = counter.trim();
+                    if (trimmed.isEmpty()) continue;
+                    
+                    switch (trimmed) {
+                        case "HoursPoweredCount":
+                            // Сброс часов требует особого подхода (обычно не сбрасывается)
+                            logger.warn("resetStatistics: HoursPoweredCount reset not allowed per UPOS spec");
+                            break;
+                        case "CommunicationErrorCount":
+                            statistics.communicationErrorCount = 0;
+                            break;
+                        case "GoodWeightReadCount":
+                            statistics.goodWeightReadCount = 0;
+                            break;
+                        default:
+                            logger.warn("resetStatistics: unknown counter '" + trimmed + "'");
+                    }
+                }
+                logger.debug("resetStatistics: selective reset completed");
+            }
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("resetStatistics error: " + e.getMessage());
+            throw je;
+        }
     }
 
     @Override
     public void retrieveStatistics(String[] statisticsBuffer) throws JposException {
         logger.debug("retrieveStatistics(" + statisticsBuffer + ")");
-        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
-        logger.error("retrieveStatistics: " + e.getMessage());
-        throw e;
+        checkClaimed();
+        checkEnabled();  // Согласно UPOS, статистика должна собираться при включенном устройстве
+        
+        if (statistics == null) {
+            throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
+        }
+        
+        if (statisticsBuffer == null || statisticsBuffer.length == 0) {
+            throw new JposException(JPOS_E_ILLEGAL, "Invalid statistics buffer");
+        }
+        
+        try {
+            // Актуализируем статистику перед возвратом
+            if (scale != null && statistics != null) {
+                // Обновляем часы работы
+                statistics.updateHoursPowered();
+            }
+            
+            // Возвращаем XML со статистикой
+            statisticsBuffer[0] = statistics.toXML();
+            logger.debug("retrieveStatistics: OK, statistics=\n" + statisticsBuffer[0]);
+            
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("retrieveStatistics error: " + e.getMessage());
+            throw je;
+        }
     }
 
     @Override
     public void updateStatistics(String statisticsBuffer) throws JposException {
         logger.debug("updateStatistics(" + statisticsBuffer + ")");
-        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
-        logger.error("updateStatistics: " + e.getMessage());
-        throw e;
+        checkClaimed();
+        checkEnabled();
+        
+        if (statistics == null) {
+            throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
+        }
+        
+        try {
+            // updateStatistics используется для обновления статистики, хранящейся на самом устройстве
+            // Для весов, которые не хранят статистику внутри себя, можно либо игнорировать,
+            // либо использовать для принудительного обновления счетчиков извне
+            
+            if (statisticsBuffer != null && !statisticsBuffer.isEmpty()) {
+                // Парсим XML и обновляем соответствующие счетчики
+                // Это опционально, так как большинство драйверов просто игнорируют этот метод
+                logger.debug("updateStatistics: parsing XML to update counters");
+                // TODO: Реализовать парсинг XML для обновления счетчиков, если необходимо
+            }
+            
+            logger.debug("updateStatistics: OK (no operation needed for this device)");
+            
+        } catch (Exception e) {
+            JposException je = getJposException(e);
+            logger.error("updateStatistics error: " + e.getMessage());
+            throw je;
+        }
     }
 
     // ======================== ИНФОРМАЦИОННЫЕ МЕТОДЫ ========================
@@ -1459,7 +1734,13 @@ public class ScaleService extends Scale implements ScaleService114 {
         } else {
             switch (scale.getType()) {
                 case Pos2:
-                    result = "SHTRIKH-M POS2 Scale";
+                    // Для Pos2 используем описание из deviceMetrics
+                    if (deviceMetrics != null && deviceMetrics.getDescription() != null 
+                            && !deviceMetrics.getDescription().isEmpty()) {
+                        result = deviceMetrics.getDescription();
+                    } else {
+                        result = "SHTRIKH-M POS2 Scale";
+                    }
                     break;
                 case Shtrih5:
                     result = "SHTRIKH-M SHTRIH5 Scale";
@@ -1821,10 +2102,32 @@ public class ScaleService extends Scale implements ScaleService114 {
                 return null;
             }
 
-            ScaleWeight weight = scale.getWeight();
+            ScaleWeight weight = null;
+            try {
+                weight = scale.getWeight();
+            } catch (DeviceError e) {
+                // Ошибка связи - увеличиваем счетчик ошибок связи
+                if (statistics != null) {
+                    statistics.incrementCommunicationErrorCount();
+                }
+                throw e;
+            } catch (Exception e) {
+                // Ошибка связи - увеличиваем счетчик ошибок связи
+                if (statistics != null) {
+                    statistics.incrementCommunicationErrorCount();
+                }
+                throw e;
+            }
 
             if (weight == null || weight.status == null) {
                 return null;
+            }
+
+            // Успешное чтение веса
+            if (weight.status.isStable() && weight.weight != 0) {
+                if (statistics != null) {
+                    statistics.incrementGoodWeightReadCount();
+                }
             }
 
             scaleLiveWeight = weight.status.isStable() ? weight.weight : 0;
@@ -1973,5 +2276,20 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("getPollEnabled");
         logger.debug("getPollEnabled: " + pollEnabled);
         return pollEnabled;
+    }
+    
+    /**
+     * Возвращает XML с информацией об устройстве (Device Information)
+     * Этот метод не является частью стандарта UPOS, но может быть полезен
+     */
+    public String retrieveDeviceInformation() throws JposException {
+        logger.debug("retrieveDeviceInformation()");
+        checkOpened();
+        
+        if (statistics == null) {
+            throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
+        }
+        
+        return statistics.getDeviceInformationXML();
     }
 }

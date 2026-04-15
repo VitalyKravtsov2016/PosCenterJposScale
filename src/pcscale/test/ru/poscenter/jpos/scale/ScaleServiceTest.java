@@ -348,8 +348,8 @@ public class ScaleServiceTest {
         assertTrue(service.getCapStatusUpdate());
         assertFalse(service.getCapUpdateFirmware());
         assertFalse(service.getCapDisplay());
-        assertFalse(service.getCapStatisticsReporting());
-        assertFalse(service.getCapUpdateStatistics());
+        assertTrue(service.getCapStatisticsReporting());
+        assertTrue(service.getCapUpdateStatistics());
         assertFalse(service.getCapDisplayText());
         assertEquals(JposConst.JPOS_PR_STANDARD, service.getCapPowerReporting());
 
