@@ -3,8 +3,11 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
+            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/ShtrihMProtocolSerial.java</file>
+            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/scale/Pos2Serial.java</file>
             <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/test/ru/poscenter/jpos/scale/ScaleServiceTest.java</file>
             <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/jpos/scale/ScaleService.java</file>
+            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/scale/DeviceFindMulti.java</file>
         </group>
     </open-files>
 </project-private>
