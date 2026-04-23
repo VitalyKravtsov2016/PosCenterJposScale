@@ -3,11 +3,13 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/ShtrihMProtocolSerial.java</file>
-            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/scale/Pos2Serial.java</file>
-            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/test/ru/poscenter/jpos/scale/ScaleServiceTest.java</file>
-            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/jpos/scale/ScaleService.java</file>
-            <file>file:/D:/Projects/PosCenter/PosCenterJposScale/src/pcscale/src/ru/poscenter/scale/DeviceFindMulti.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/port/GnuSerialPort.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/scaletst/ScaleTest.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/test/ConsoleTest.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/ScaleTestConsole.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/IDevice.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/test/ru/poscenter/ScaleCLITest.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/scaletst/ConnectionPage.java</file>
         </group>
     </open-files>
 </project-private>

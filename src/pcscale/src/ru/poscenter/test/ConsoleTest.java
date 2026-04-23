@@ -73,6 +73,20 @@ public class ConsoleTest {
         }
     }
 
+    private void printSettings() {
+        try {
+            System.out.println("Настройки:");
+            System.out.println("Тип порта: " + scale.getParam(IDevice.PARAM_PORTTYPE));
+            System.out.println("Имя порта: " + scale.getParam(IDevice.PARAM_PORTNAME));
+            System.out.println("Скорость: " + scale.getParam(IDevice.PARAM_BAUDRATE));
+            System.out.println("Таймаут чтения: " + scale.getParam(IDevice.PARAM_READ_TIMEOUT) + " мс");
+            System.out.println("Таймаут открытия: " + scale.getParam(IDevice.PARAM_OPEN_TIMEOUT) + " мс");
+            System.out.println("Пароль: " + scale.getParam(IDevice.PARAM_PASSWORD));
+        } catch (Exception e) {
+            System.out.println("Ошибка печати настроек: " + e.getMessage());
+        }
+    }
+    
     public void run() {
         System.out.println("=== КОНСОЛЬНОЕ ПРИЛОЖЕНИЕ ДЛЯ РАБОТЫ С ВЕСАМИ ===");
         
@@ -311,11 +325,11 @@ public class ConsoleTest {
     }
 
     private void settingsMenu() {
+        printSettings();
         System.out.println("\n=== НАСТРОЙКИ ===");
         System.out.println("1. Изменить порт");
         System.out.println("2. Изменить скорость");
         System.out.println("3. Изменить таймаут");
-        System.out.println("4. Сохранить настройки");
         System.out.print("Выберите действие: ");
         
         String choice = scanner.nextLine().trim();
@@ -326,22 +340,26 @@ public class ConsoleTest {
                     String port = scanner.nextLine();
                     scale.setParam(IDevice.PARAM_PORTNAME, port);
                     System.out.println("Порт изменен на: " + port);
+                    saveSettings();
+                    printSettings();
                     break;
                 case "2":
                     System.out.print("Скорость (2400, 4800, 9600, ...): ");
                     int baud = Integer.parseInt(scanner.nextLine());
                     scale.setParam(IDevice.PARAM_BAUDRATE, String.valueOf(baud));
                     System.out.println("Скорость изменена на: " + baud);
+                    saveSettings();
+                    printSettings();
                     break;
                 case "3":
                     System.out.print("Таймаут (мс): ");
                     int timeout = Integer.parseInt(scanner.nextLine());
                     scale.setParam(IDevice.PARAM_OPEN_TIMEOUT, String.valueOf(timeout));
                     System.out.println("Таймаут изменен на: " + timeout + "мс");
-                    break;
-                case "4":
                     saveSettings();
+                    printSettings();
                     break;
+                    
                 default:
                     System.out.println("Неверный выбор");
             }
