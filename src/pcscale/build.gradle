@@ -68,12 +68,15 @@ task utilVersionClass() {
     clazz.text = "package ru.poscenter.util;\n\npublic class ServiceVersion {\n    public static final String VERSION = \""+version+"\";\n}"
 }
 
+
 jar {
     archiveFileName = "pcscale-" + version + ".jar"
     manifest {
         attributes(
             "Implementation-Title": "POSCenter.JavaPOS",
-            "Class-Path": configurations.compileClasspath.collect { it.getName() }.join(' '),
+            "Class-Path": configurations.compileClasspath.collect { it.getName() }.findAll { 
+                !it.contains('xerces') && !it.contains('xml-apis')
+            }.join(' '),
             "Implementation-Version": version
         )
     }
