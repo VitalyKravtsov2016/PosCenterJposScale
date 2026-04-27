@@ -112,6 +112,14 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
+// Задача запуска графического теста JPOS-драйвера весов
+task runJposScaleTest(type: JavaExec, dependsOn: compileJava) {
+    group = 'application'
+    description = 'Запуск графического теста JPOS-драйвера весов (UPOS 1.14)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ru.poscenter.jpostest.JposScaleTestApp'
+}
+
 // Настройка для тестов
 test {
     useJUnit()
