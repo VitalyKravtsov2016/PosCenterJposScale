@@ -15,7 +15,7 @@ sourceSets {
         }
         resources {
             srcDirs = [ "${projectDir}/src/" ]
-            includes = [ "res/*.*", "**/resources/*.*" ]
+            includes = [ "res/*.bat", "res/*.sh", "res/*.doc", "res/*.pdf", "res/*.txt", "res/*.xml","**/resources/*.*" ]
         }
     }
     // Эта секция уже настроена правильно, но я явно указываю для ясности
@@ -80,6 +80,44 @@ jar {
 }
 jar.dependsOn('utilVersionClass')
 
+// Задача для подстановки версии в тестовые скрипты
+task substituteVersionInScripts() {
+    def versionNumber = version
+    
+    // Список файлов для обработки
+    def scriptFiles = [
+        'ctest.bat',
+        'test.bat', 
+        'ctest.sh',
+        'test.sh'
+    ]
+    
+    scriptFiles.each { fileName ->
+        def outFile = file("${projectDir}/res/${fileName}")
+        def templateFile = file("${projectDir}/tmp/${fileName}.template")
+        if (templateFile.exists()) {
+            // Читаем содержимое файла
+            String content = templateFile.text
+            // Заменяем токен {VERSION} на актуальную версию
+            String newContent = content.replace('{VERSION}', versionNumber)
+            // Записываем обратно
+            outFile.text = newContent
+            
+            // Для .sh файлов делаем исполняемыми
+            if (fileName.endsWith('.sh')) {
+                outFile.setExecutable(true)
+            }
+            
+            println "Updated ${fileName} with version ${versionNumber}"
+        } else {
+            println "Warning: ${fileName} not found, skipping"
+        }
+    }
+}
+
+// Автоматически запускаем подстановку версии перед сборкой JAR
+jar.dependsOn substituteVersionInScripts
+
 task dist(type: Zip) {
     destinationDirectory = file("${rootDir}/../dist/zip/javase/")
     archiveBaseName = 'poscenter-jpos-scale'
@@ -87,7 +125,7 @@ task dist(type: Zip) {
     
     from jar.archiveFile
     from configurations.compileClasspath
-    from "Res/"
+    from "res"
     from "${rootDir}/../History.txt"
     from "${rootDir}/../Doc/JposScaleDriver.txt"
 }
