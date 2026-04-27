@@ -1876,7 +1876,6 @@ public class ScaleService extends Scale implements ScaleService114 {
         eventThread = new Thread(new EventTarget(this), "ScaleEventThread");
         eventThread.setDaemon(true);
         eventThread.start();
-        logger.debug("Event thread started");
     }
 
     private void stopEventThread() {
@@ -1942,7 +1941,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void eventProc() {
         logger.debug("Event thread started");
         try {
-            while (!Thread.interrupted() && state != JPOS_S_CLOSED) {
+            while (!Thread.interrupted()) {
                 
                 // Смотрим первый элемент в очереди, не извлекая
                 JposEvent event = eventQueue.peek();

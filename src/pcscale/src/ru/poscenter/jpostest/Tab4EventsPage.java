@@ -97,6 +97,7 @@ public class Tab4EventsPage extends JPanel
             case jpos.ScaleConst.SCAL_SUE_WEIGHT_OVERWEIGHT: return "WEIGHT_OVERWEIGHT";
             case jpos.ScaleConst.SCAL_SUE_NOT_READY:         return "NOT_READY";
             case jpos.ScaleConst.SCAL_SUE_WEIGHT_UNDER_ZERO: return "WEIGHT_UNDER_ZERO";
+                
             case jpos.JposConst.JPOS_PS_ONLINE:              return "POWER_ONLINE";
             case jpos.JposConst.JPOS_PS_OFF:                 return "POWER_OFF";
             case jpos.JposConst.JPOS_PS_OFFLINE:             return "POWER_OFFLINE";
