@@ -339,7 +339,7 @@ public class Tab3Scale114Page extends JPanel {
     private void doFreezeValue() {
         try {
             int item = 0;
-            if (cbFreezeManualTare.isSelected())   item |= ScaleConst.SCAL_SFR_MANUAL_TARE;
+            if (cbFreezeManualTare.isSelected())    item |= ScaleConst.SCAL_SFR_MANUAL_TARE;
             if (cbFreezeWeightedTare.isSelected())  item |= ScaleConst.SCAL_SFR_WEIGHTED_TARE;
             if (cbFreezePercentTare.isSelected())   item |= ScaleConst.SCAL_SFR_PERCENT_TARE;
             if (cbFreezeUnitPrice.isSelected())     item |= ScaleConst.SCAL_SFR_UNITPRICE;
