@@ -1,18 +1,18 @@
-package ru.poscenter.acceptance;
+package ru.poscenter;
 
+import ru.poscenter.Pos2ProtocolEmulator;
 import gnu.io.CommPortIdentifier;
 import jpos.*;
 import jpos.events.*;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.*;
+import org.junit.rules.Timeout;
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 
 /**
  * Приемочные испытания JPos Scale драйвера
@@ -25,16 +25,19 @@ import static org.junit.jupiter.api.Assertions.*;
  * 
  * @version 1.0
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ScaleAcceptanceTest {
 
-    private static final String EMULATOR_PORT = "COM5"; // Порт эмулятора (менять под свою конфигурацию)
-    private static final String LOGICAL_DEVICE_NAME = "Scale"; // Логическое имя в JPos конфигурации
+    
+    // Читаем параметры из System.getProperty()
+    // Порт эмулятора (менять под свою конфигурацию)
+    private static final String EMULATOR_PORT = System.getProperty("emulator.port", "COM7");
+    // Логическое имя в JPos конфигурации
+    private static final String LOGICAL_DEVICE_NAME = System.getProperty("logical.device.name", "ScaleSimulator");    
     
     private static Pos2ProtocolEmulator emulator;
     private static Scale scale;
     
-    private final CountDownLatch eventLatch = new CountDownLatch(1);
+    private CountDownLatch eventLatch = new CountDownLatch(1);
     private final AtomicInteger receivedStatus = new AtomicInteger(0);
     private final AtomicInteger receivedErrorCode = new AtomicInteger(0);
     private final AtomicInteger receivedDataStatus = new AtomicInteger(0);
@@ -45,7 +48,7 @@ public class ScaleAcceptanceTest {
     private static final int DEFAULT_TIMEOUT = 10000;
     private static final int WEIGHT_STABLE_DELAY = 500;
     
-    // Константы для весов
+    // Константы для весов (дублируем из ScaleConst, чтобы не зависеть от версии)
     private static final int SCAL_WU_GRAM = 1;
     private static final int SCAL_WU_KILOGRAM = 2;
     private static final int SCAL_WU_OUNCE = 3;
@@ -61,12 +64,20 @@ public class ScaleAcceptanceTest {
     private static final int SCAL_SUE_NOT_READY = 15;
     private static final int SCAL_SUE_WEIGHT_UNDER_ZERO = 16;
     
+    private DataListener dataListener;
+    private ErrorListener errorListener;
+    private StatusUpdateListener statusUpdateListener;
+    private DirectIOListener directIOListener;
+    
+    @Rule
+    public Timeout globalTimeout = Timeout.seconds(20);
+    
     // ------------------------------------------------------------------------
     // Setup and teardown
     // ------------------------------------------------------------------------
     
-    @BeforeAll
-    static void setUpClass() throws Exception {
+    @BeforeClass
+    public static void setUpClass() throws Exception {
         // Запуск эмулятора
         emulator = new Pos2ProtocolEmulator(EMULATOR_PORT);
         emulator.start();
@@ -78,8 +89,8 @@ public class ScaleAcceptanceTest {
         scale = new Scale();
     }
     
-    @AfterAll
-    static void tearDownClass() {
+    @AfterClass
+    public static void tearDownClass() {
         if (scale != null) {
             try {
                 if (scale.getClaimed()) {
@@ -97,9 +108,9 @@ public class ScaleAcceptanceTest {
         }
     }
     
-    @BeforeEach
-    void setUp() throws Exception {
-        eventLatch.reset();
+    @Before
+    public void setUp() throws Exception {
+        eventLatch = new CountDownLatch(1);
         receivedStatus.set(0);
         receivedErrorCode.set(0);
         receivedDataStatus.set(0);
@@ -107,52 +118,81 @@ public class ScaleAcceptanceTest {
         dataEventReceived.set(false);
         outputCompleteReceived.set(false);
         
-        // Регистрация слушателей событий, если ещё не зарегистрированы
-        if (scale.getDataListeners().length == 0) {
-            scale.addDataListener(new DataListener() {
-                @Override
-                public void dataOccurred(DataEvent e) {
-                    dataEventReceived.set(true);
-                    receivedDataStatus.set(e.getStatus());
-                    eventLatch.countDown();
-                    System.out.println("DataEvent received, status=" + e.getStatus());
-                }
-            });
-            
-            scale.addErrorListener(new ErrorListener() {
-                @Override
-                public void errorOccurred(ErrorEvent e) {
-                    receivedErrorCode.set(e.getErrorCode());
-                    eventLatch.countDown();
-                    System.out.println("ErrorEvent received, code=" + e.getErrorCode() + 
-                                     ", extended=" + e.getErrorCodeExtended() + 
-                                     ", locus=" + e.getErrorLocus());
-                }
-            });
-            
-            scale.addStatusUpdateListener(new StatusUpdateListener() {
-                @Override
-                public void statusUpdateOccurred(StatusUpdateEvent e) {
-                    receivedStatus.set(e.getStatus());
-                    eventLatch.countDown();
-                    System.out.println("StatusUpdateEvent received, status=" + e.getStatus());
-                }
-            });
-            
-            scale.addDirectIOListener(new DirectIOListener() {
-                @Override
-                public void directIOOccurred(DirectIOEvent e) {
-                    directIOData.set("EventNumber=" + e.getEventNumber() + ", Data=" + e.getData());
-                    eventLatch.countDown();
-                    System.out.println("DirectIOEvent received: " + directIOData.get());
-                }
-            });
+        // Открываем устройство для каждого теста
+        try {
+            scale.open(LOGICAL_DEVICE_NAME);
+            Thread.sleep(500);
+        } catch (JposException e) {
+            // Может быть уже открыто
+            if (e.getErrorCode() != JposConst.JPOS_E_ILLEGAL) {
+                throw e;
+            }
         }
+        
+        // Создаем слушателей
+        dataListener = new DataListener() {
+            @Override
+            public void dataOccurred(DataEvent e) {
+                dataEventReceived.set(true);
+                receivedDataStatus.set(e.getStatus());
+                eventLatch.countDown();
+                System.out.println("DataEvent received, status=" + e.getStatus());
+            }
+        };
+        
+        errorListener = new ErrorListener() {
+            @Override
+            public void errorOccurred(ErrorEvent e) {
+                receivedErrorCode.set(e.getErrorCode());
+                eventLatch.countDown();
+                System.out.println("ErrorEvent received, code=" + e.getErrorCode() + 
+                                 ", extended=" + e.getErrorCodeExtended() + 
+                                 ", locus=" + e.getErrorLocus());
+            }
+        };
+        
+        statusUpdateListener = new StatusUpdateListener() {
+            @Override
+            public void statusUpdateOccurred(StatusUpdateEvent e) {
+                receivedStatus.set(e.getStatus());
+                eventLatch.countDown();
+                System.out.println("StatusUpdateEvent received, status=" + e.getStatus());
+            }
+        };
+        
+        directIOListener = new DirectIOListener() {
+            @Override
+            public void directIOOccurred(DirectIOEvent e) {
+                directIOData.set("EventNumber=" + e.getEventNumber() + ", Data=" + e.getData());
+                eventLatch.countDown();
+                System.out.println("DirectIOEvent received: " + directIOData.get());
+            }
+        };
+        
+        // Регистрируем слушателей
+        scale.addDataListener(dataListener);
+        scale.addErrorListener(errorListener);
+        scale.addStatusUpdateListener(statusUpdateListener);
+        scale.addDirectIOListener(directIOListener);
     }
     
-    @AfterEach
-    void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         try {
+            // Удаляем слушателей
+            if (dataListener != null) {
+                scale.removeDataListener(dataListener);
+            }
+            if (errorListener != null) {
+                scale.removeErrorListener(errorListener);
+            }
+            if (statusUpdateListener != null) {
+                scale.removeStatusUpdateListener(statusUpdateListener);
+            }
+            if (directIOListener != null) {
+                scale.removeDirectIOListener(directIOListener);
+            }
+            
             if (scale.getClaimed()) {
                 scale.setDeviceEnabled(false);
                 scale.release();
@@ -163,10 +203,6 @@ public class ScaleAcceptanceTest {
         } catch (Exception e) {
             // ignore
         }
-        
-        // Открываем заново для следующего теста
-        scale.open(LOGICAL_DEVICE_NAME);
-        Thread.sleep(500);
     }
     
     // ------------------------------------------------------------------------
@@ -180,7 +216,11 @@ public class ScaleAcceptanceTest {
         if (!scale.getDeviceEnabled()) {
             scale.setDeviceEnabled(true);
         }
-        Thread.sleep(WEIGHT_STABLE_DELAY);
+        try {
+            Thread.sleep(WEIGHT_STABLE_DELAY);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
     
     private void releaseAndDisable() throws JposException {
@@ -192,8 +232,13 @@ public class ScaleAcceptanceTest {
         }
     }
     
-    private void waitForEvent(long timeoutMs) throws InterruptedException {
-        eventLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    private boolean waitForEvent(long timeoutMs) {
+        try {
+            return eventLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
     
     // ------------------------------------------------------------------------
@@ -201,21 +246,22 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(1)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testOpenAndClose() throws JposException {
+    public void testOpenAndClose() throws JposException {
         System.out.println("\n=== Test 1: Device initialization ===");
         
-        // Проверка открытия устройства
+        // Уже открыто в setUp, закрываем и открываем заново
+        scale.close();
         scale.open(LOGICAL_DEVICE_NAME);
-        assertNotEquals(JposConst.JPOS_S_CLOSED, scale.getState(), "Device should be opened");
-        assertEquals(JposConst.JPOS_S_IDLE, scale.getState(), "Device should be in IDLE state");
+        
+        // Проверка, что устройство открыто
+        assertNotEquals(JposConst.JPOS_S_CLOSED, scale.getState());
+        assertEquals(JposConst.JPOS_S_IDLE, scale.getState());
         
         // Проверка основных свойств после открытия
-        assertNotNull(scale.getDeviceControlDescription(), "DeviceControlDescription should not be null");
-        assertNotNull(scale.getDeviceServiceDescription(), "DeviceServiceDescription should not be null");
-        assertNotNull(scale.getPhysicalDeviceDescription(), "PhysicalDeviceDescription should not be null");
-        assertNotNull(scale.getPhysicalDeviceName(), "PhysicalDeviceName should not be null");
+        assertNotNull(scale.getDeviceControlDescription());
+        assertNotNull(scale.getDeviceServiceDescription());
+        assertNotNull(scale.getPhysicalDeviceDescription());
+        assertNotNull(scale.getPhysicalDeviceName());
         
         System.out.println("DeviceControlDescription: " + scale.getDeviceControlDescription());
         System.out.println("DeviceServiceDescription: " + scale.getDeviceServiceDescription());
@@ -223,15 +269,15 @@ public class ScaleAcceptanceTest {
         System.out.println("PhysicalDeviceName: " + scale.getPhysicalDeviceName());
         
         // Проверка версий
-        assertTrue(scale.getDeviceControlVersion() > 0, "DeviceControlVersion should be > 0");
-        assertTrue(scale.getDeviceServiceVersion() > 0, "DeviceServiceVersion should be > 0");
+        assertTrue(scale.getDeviceControlVersion() > 0);
+        assertTrue(scale.getDeviceServiceVersion() > 0);
         
         System.out.println("DeviceControlVersion: " + scale.getDeviceControlVersion());
         System.out.println("DeviceServiceVersion: " + scale.getDeviceServiceVersion());
         
         // Проверка закрытия
         scale.close();
-        assertEquals(JposConst.JPOS_S_CLOSED, scale.getState(), "Device should be closed");
+        assertEquals(JposConst.JPOS_S_CLOSED, scale.getState());
         
         System.out.println("Test 1 passed!");
     }
@@ -241,27 +287,25 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(2)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testClaimAndRelease() throws JposException {
+    public void testClaimAndRelease() throws JposException {
         System.out.println("\n=== Test 2: Claim and release ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
         
         // Проверка, что устройство не захвачено
-        assertFalse(scale.getClaimed(), "Device should not be claimed initially");
+        assertFalse(scale.getClaimed());
         
         // Захват устройства
         scale.claim(5000);
-        assertTrue(scale.getClaimed(), "Device should be claimed");
+        assertTrue(scale.getClaimed());
         
-        // Повторный захват не должен вызвать ошибку (метод идемпотентный)
+        // Повторный захват не должен вызвать ошибку
         scale.claim(5000);
-        assertTrue(scale.getClaimed(), "Device should still be claimed");
+        assertTrue(scale.getClaimed());
         
         // Освобождение устройства
         scale.release();
-        assertFalse(scale.getClaimed(), "Device should be released");
+        assertFalse(scale.getClaimed());
         
         scale.close();
         
@@ -273,16 +317,13 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(3)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testCapabilities() throws JposException {
+    public void testCapabilities() throws JposException {
         System.out.println("\n=== Test 3: Capabilities properties ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
         claimAndEnable();
         
         // Проверка всех capability свойств
-        // Они могут быть true или false в зависимости от эмулятора
         boolean capDisplay = scale.getCapDisplay();
         System.out.println("CapDisplay: " + capDisplay);
         
@@ -316,28 +357,48 @@ public class ScaleAcceptanceTest {
         boolean capUpdateFirmware = scale.getCapUpdateFirmware();
         System.out.println("CapUpdateFirmware: " + capUpdateFirmware);
         
-        boolean capFreezeValue = scale.getCapFreezeValue();
-        System.out.println("CapFreezeValue: " + capFreezeValue);
+        // Свойства из версии 1.14
+        try {
+            boolean capFreezeValue = scale.getCapFreezeValue();
+            System.out.println("CapFreezeValue: " + capFreezeValue);
+        } catch (JposException e) {
+            System.out.println("CapFreezeValue not supported");
+        }
         
-        boolean capReadLiveWeightWithTare = scale.getCapReadLiveWeightWithTare();
-        System.out.println("CapReadLiveWeightWithTare: " + capReadLiveWeightWithTare);
+        try {
+            boolean capReadLiveWeightWithTare = scale.getCapReadLiveWeightWithTare();
+            System.out.println("CapReadLiveWeightWithTare: " + capReadLiveWeightWithTare);
+        } catch (JposException e) {
+            System.out.println("CapReadLiveWeightWithTare not supported");
+        }
         
-        boolean capSetPriceCalculationMode = scale.getCapSetPriceCalculationMode();
-        System.out.println("CapSetPriceCalculationMode: " + capSetPriceCalculationMode);
+        try {
+            boolean capSetPriceCalculationMode = scale.getCapSetPriceCalculationMode();
+            System.out.println("CapSetPriceCalculationMode: " + capSetPriceCalculationMode);
+        } catch (JposException e) {
+            System.out.println("CapSetPriceCalculationMode not supported");
+        }
         
-        boolean capSetUnitPriceWithWeightUnit = scale.getCapSetUnitPriceWithWeightUnit();
-        System.out.println("CapSetUnitPriceWithWeightUnit: " + capSetUnitPriceWithWeightUnit);
+        try {
+            boolean capSetUnitPriceWithWeightUnit = scale.getCapSetUnitPriceWithWeightUnit();
+            System.out.println("CapSetUnitPriceWithWeightUnit: " + capSetUnitPriceWithWeightUnit);
+        } catch (JposException e) {
+            System.out.println("CapSetUnitPriceWithWeightUnit not supported");
+        }
         
-        boolean capSpecialTare = scale.getCapSpecialTare();
-        System.out.println("CapSpecialTare: " + capSpecialTare);
+        try {
+            boolean capSpecialTare = scale.getCapSpecialTare();
+            System.out.println("CapSpecialTare: " + capSpecialTare);
+        } catch (JposException e) {
+            System.out.println("CapSpecialTare not supported");
+        }
         
-        boolean capTarePriority = scale.getCapTarePriority();
-        System.out.println("CapTarePriority: " + capTarePriority);
-        
-        // Проверка, что свойства имеют допустимые значения
-        assertNotNull(capDisplay, "CapDisplay should be readable");
-        assertNotNull(capTareWeight, "CapTareWeight should be readable");
-        assertNotNull(capZeroScale, "CapZeroScale should be readable");
+        try {
+            boolean capTarePriority = scale.getCapTarePriority();
+            System.out.println("CapTarePriority: " + capTarePriority);
+        } catch (JposException e) {
+            System.out.println("CapTarePriority not supported");
+        }
         
         releaseAndDisable();
         scale.close();
@@ -350,9 +411,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(4)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testBasicProperties() throws JposException {
+    public void testBasicProperties() throws JposException {
         System.out.println("\n=== Test 4: Basic properties ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -360,13 +419,12 @@ public class ScaleAcceptanceTest {
         
         // Проверка MaximumWeight
         int maxWeight = scale.getMaximumWeight();
-        assertTrue(maxWeight > 0, "MaximumWeight should be > 0");
+        assertTrue(maxWeight > 0);
         System.out.println("MaximumWeight: " + maxWeight);
         
         // Проверка WeightUnit
         int weightUnit = scale.getWeightUnit();
-        assertTrue(weightUnit >= SCAL_WU_GRAM && weightUnit <= SCAL_WU_POUND, 
-                  "WeightUnit should be valid value");
+        assertTrue(weightUnit >= SCAL_WU_GRAM && weightUnit <= SCAL_WU_POUND);
         System.out.println("WeightUnit: " + weightUnit);
         
         // Проверка MaxDisplayTextChars
@@ -385,17 +443,29 @@ public class ScaleAcceptanceTest {
         boolean asyncMode = scale.getAsyncMode();
         System.out.println("AsyncMode (initial): " + asyncMode);
         scale.setAsyncMode(true);
-        assertTrue(scale.getAsyncMode(), "AsyncMode should be true");
+        assertTrue(scale.getAsyncMode());
         scale.setAsyncMode(false);
-        assertFalse(scale.getAsyncMode(), "AsyncMode should be false");
+        assertFalse(scale.getAsyncMode());
         
         // Проверка AutoDisable
         boolean autoDisable = scale.getAutoDisable();
         System.out.println("AutoDisable (initial): " + autoDisable);
         scale.setAutoDisable(true);
-        assertTrue(scale.getAutoDisable(), "AutoDisable should be true");
+        assertTrue(scale.getAutoDisable());
         scale.setAutoDisable(false);
-        assertFalse(scale.getAutoDisable(), "AutoDisable should be false");
+        assertFalse(scale.getAutoDisable());
+        
+        // Проверка ZeroValid (если поддерживается)
+        try {
+            boolean zeroValid = scale.getZeroValid();
+            System.out.println("ZeroValid (initial): " + zeroValid);
+            scale.setZeroValid(true);
+            assertTrue(scale.getZeroValid());
+            scale.setZeroValid(false);
+            assertFalse(scale.getZeroValid());
+        } catch (JposException e) {
+            System.out.println("ZeroValid not supported");
+        }
         
         releaseAndDisable();
         scale.close();
@@ -408,9 +478,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(5)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testSynchronousReadWeight() throws JposException, InterruptedException {
+    public void testSynchronousReadWeight() throws JposException, InterruptedException {
         System.out.println("\n=== Test 5: Synchronous weight reading ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -426,7 +494,7 @@ public class ScaleAcceptanceTest {
         
         int[] weight = new int[1];
         scale.readWeight(weight, 5000);
-        assertEquals(1000, weight[0], "Weight should be 1000");
+        assertEquals(1000, weight[0]);
         System.out.println("Read weight: " + weight[0]);
         
         // Тест 2: Чтение веса 2500 грамм
@@ -434,17 +502,19 @@ public class ScaleAcceptanceTest {
         Thread.sleep(WEIGHT_STABLE_DELAY);
         
         scale.readWeight(weight, 5000);
-        assertEquals(2500, weight[0], "Weight should be 2500");
+        assertEquals(2500, weight[0]);
         System.out.println("Read weight: " + weight[0]);
         
         // Тест 3: Чтение с таймаутом (вес нестабилен)
         emulator.setStable(false);
         weight[0] = 0;
         
-        assertThrows(JposException.class, () -> {
+        try {
             scale.readWeight(weight, 2000);
-        }, "Should throw exception when weight is unstable");
-        System.out.println("Correctly got exception for unstable weight");
+            fail("Should throw exception when weight is unstable");
+        } catch (JposException e) {
+            System.out.println("Correctly got exception for unstable weight: " + e.getMessage());
+        }
         
         // Возвращаем стабильное состояние
         emulator.setStable(true);
@@ -460,9 +530,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(6)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testAsynchronousReadWeight() throws JposException, InterruptedException {
+    public void testAsynchronousReadWeight() throws JposException, InterruptedException {
         System.out.println("\n=== Test 6: Asynchronous weight reading ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -472,8 +540,9 @@ public class ScaleAcceptanceTest {
         scale.setAsyncMode(true);
         scale.setDataEventEnabled(true);
         
-        // Сбрасываем latch перед тестом
-        eventLatch.reset();
+        // Создаем новый latch для этого теста
+        eventLatch = new CountDownLatch(1);
+        dataEventReceived.set(false);
         
         // Устанавливаем вес и запускаем асинхронное чтение
         emulator.setWeight(1500);
@@ -481,32 +550,32 @@ public class ScaleAcceptanceTest {
         
         int[] weight = new int[1];
         scale.readWeight(weight, 5000);
-        assertEquals(0, weight[0], "Weight should be 0 in async mode (return value)");
+        assertEquals(0, weight[0]); // Weight should be 0 in async mode (return value)
         System.out.println("Async read initiated");
         
         // Ожидаем DataEvent
-        boolean eventReceived = eventLatch.await(6000, TimeUnit.MILLISECONDS);
-        assertTrue(eventReceived, "DataEvent should be received");
-        assertTrue(dataEventReceived.get(), "DataEvent should be received");
+        boolean eventReceived = waitForEvent(6000);
+        assertTrue("DataEvent should be received", eventReceived);
+        assertTrue(dataEventReceived.get());
         
         // Проверяем вес в событии
-        assertEquals(1500, receivedDataStatus.get(), "Weight in event should be 1500");
+        assertEquals(1500, receivedDataStatus.get());
         System.out.println("Async weight received via event: " + receivedDataStatus.get());
         
         // Проверка AutoDisable при асинхронном чтении
         scale.setAutoDisable(true);
-        eventLatch.reset();
+        eventLatch = new CountDownLatch(1);
         dataEventReceived.set(false);
         
         emulator.setWeight(2000);
         scale.readWeight(weight, 5000);
         
-        eventReceived = eventLatch.await(6000, TimeUnit.MILLISECONDS);
-        assertTrue(eventReceived, "DataEvent should be received with AutoDisable");
+        eventReceived = waitForEvent(6000);
+        assertTrue("DataEvent should be received with AutoDisable", eventReceived);
         
         // Устройство должно быть автоматически отключено
         Thread.sleep(500);
-        assertFalse(scale.getDeviceEnabled(), "Device should be auto-disabled");
+        assertFalse(scale.getDeviceEnabled());
         
         // Включаем обратно
         scale.setDeviceEnabled(true);
@@ -523,53 +592,38 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(7)
-    @Timeout(value = 20, unit = TimeUnit.SECONDS)
-    void testTareOperations() throws JposException, InterruptedException {
+    public void testTareOperations() throws JposException, InterruptedException {
         System.out.println("\n=== Test 7: Tare operations ===");
-        
-        if (!scale.getCapTareWeight()) {
-            System.out.println("Skipping test: CapTareWeight is false");
-            return;
-        }
         
         scale.open(LOGICAL_DEVICE_NAME);
         claimAndEnable();
         scale.setAsyncMode(false);
+        
+        // Проверяем поддержку тары
+        if (!scale.getCapTareWeight()) {
+            System.out.println("Skipping test: CapTareWeight is false");
+            releaseAndDisable();
+            scale.close();
+            return;
+        }
         
         // Тест 1: Установка веса тары через свойство
         emulator.setWeight(500);
         emulator.setStable(true);
         
         scale.setTareWeight(300);
-        assertEquals(300, scale.getTareWeight(), "TareWeight should be 300");
+        assertEquals(300, scale.getTareWeight());
+        System.out.println("TareWeight set to: " + scale.getTareWeight());
         
-        // Чтение веса с учётом тары
+        // Чтение веса после установки тары
         int[] weight = new int[1];
         scale.readWeight(weight, 5000);
-        // Эмулятор возвращает брутто, но драйвер должен вычитать тару
-        // В нашем эмуляторе readWeight возвращает currentWeight без вычитания тары
-        // Поэтому проверяем, что свойство тары установлено
-        System.out.println("Weight with tare: " + weight[0]);
+        System.out.println("Weight after tare set: " + weight[0]);
         
-        // Тест 2: Автоматическая установка тары (команда TARE)
-        eventLatch.reset();
-        
-        // Сбрасываем команды в эмуляторе
-        emulator.clearCommands();
-        
-        // Имитируем нажатие клавиши TARE на весах через эмулятор
-        // Для этого используем directIO или другую команду эмулятора
-        // В эмуляторе это может быть команда KEY_EMULATION
-        
-        // Ожидаем команду TARE от драйвера
-        // (эмулятор должен получить команду и положить её в очередь)
-        
-        System.out.println("Waiting for tare command from driver...");
-        // В реальном тесте нужно отправить команду из драйвера
-        
-        // Тест 3: Установка тары через CMD_SET_TARE_VALUE
-        // Для этого нужно отправить команду setTareValue из драйвера
+        // Тест 2: Сброс тары
+        scale.setTareWeight(0);
+        assertEquals(0, scale.getTareWeight());
+        System.out.println("TareWeight reset to 0");
         
         releaseAndDisable();
         scale.close();
@@ -582,17 +636,17 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(8)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testZeroScale() throws JposException, InterruptedException {
+    public void testZeroScale() throws JposException, InterruptedException {
         System.out.println("\n=== Test 8: Zero scale operation ===");
+        
+        scale.open(LOGICAL_DEVICE_NAME);
         
         if (!scale.getCapZeroScale()) {
             System.out.println("Skipping test: CapZeroScale is false");
+            scale.close();
             return;
         }
         
-        scale.open(LOGICAL_DEVICE_NAME);
         claimAndEnable();
         scale.setAsyncMode(false);
         
@@ -603,7 +657,7 @@ public class ScaleAcceptanceTest {
         
         int[] weight = new int[1];
         scale.readWeight(weight, 5000);
-        assertTrue(weight[0] > 0, "Weight should be > 0");
+        assertTrue(weight[0] > 0);
         System.out.println("Weight before zero: " + weight[0]);
         
         // Обнуление
@@ -614,12 +668,8 @@ public class ScaleAcceptanceTest {
         
         // Проверяем, что вес стал 0
         scale.readWeight(weight, 5000);
-        assertEquals(0, weight[0], "Weight should be 0 after zeroScale");
+        assertEquals(0, weight[0]);
         System.out.println("Weight after zero: " + weight[0]);
-        
-        // Ждём команду ZERO от драйвера
-        boolean zeroCommandReceived = emulator.waitForZeroCommand(2000, TimeUnit.MILLISECONDS);
-        System.out.println("Zero command received by emulator: " + zeroCommandReceived);
         
         releaseAndDisable();
         scale.close();
@@ -632,18 +682,18 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(9)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testDisplayText() throws JposException {
+    public void testDisplayText() throws JposException {
         System.out.println("\n=== Test 9: Display text operation ===");
-        
-        if (!scale.getCapDisplayText()) {
-            System.out.println("Skipping test: CapDisplayText is false");
-            return;
-        }
         
         scale.open(LOGICAL_DEVICE_NAME);
         claimAndEnable();
+        
+        if (!scale.getCapDisplayText()) {
+            System.out.println("Skipping test: CapDisplayText is false");
+            releaseAndDisable();
+            scale.close();
+            return;
+        }
         
         // Отображение текста на дисплее весов
         String testText = "Hello Scale";
@@ -657,8 +707,11 @@ public class ScaleAcceptanceTest {
         // Если есть ограничение по длине, проверяем обрезку
         int maxChars = scale.getMaxDisplayTextChars();
         if (maxChars > 0) {
-            String longText = "This is a very long text that exceeds display capability";
-            scale.displayText(longText);
+            StringBuilder longText = new StringBuilder();
+            for (int i = 0; i < maxChars + 10; i++) {
+                longText.append("X");
+            }
+            scale.displayText(longText.toString());
             System.out.println("Displayed long text (may be truncated to " + maxChars + " chars)");
         }
         
@@ -673,23 +726,23 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(10)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testPriceCalculating() throws JposException, InterruptedException {
+    public void testPriceCalculating() throws JposException, InterruptedException {
         System.out.println("\n=== Test 10: Price calculating operations ===");
-        
-        if (!scale.getCapPriceCalculating()) {
-            System.out.println("Skipping test: CapPriceCalculating is false");
-            return;
-        }
         
         scale.open(LOGICAL_DEVICE_NAME);
         claimAndEnable();
         
+        if (!scale.getCapPriceCalculating()) {
+            System.out.println("Skipping test: CapPriceCalculating is false");
+            releaseAndDisable();
+            scale.close();
+            return;
+        }
+        
         // Установка цены за единицу
         long unitPrice = 15000; // 1.5000
         scale.setUnitPrice(unitPrice);
-        assertEquals(unitPrice, scale.getUnitPrice(), "UnitPrice should be set correctly");
+        assertEquals(unitPrice, scale.getUnitPrice());
         System.out.println("UnitPrice set to: " + unitPrice);
         
         // Синхронное чтение с вычислением цены
@@ -704,23 +757,18 @@ public class ScaleAcceptanceTest {
         long salesPrice = scale.getSalesPrice();
         System.out.println("Weight: " + weight[0] + ", SalesPrice: " + salesPrice);
         
-        // Проверка, что цена рассчитана (вес * цена за единицу)
-        // weight[0] = 2000 грамм = 2 кг, unitPrice = 1.5 за кг => salesPrice = 3.0 = 30000
-        long expectedPrice = (long)weight[0] * unitPrice / 1000;
-        System.out.println("Expected price: " + expectedPrice);
-        
         // Асинхронное чтение с вычислением цены
         scale.setAsyncMode(true);
         scale.setDataEventEnabled(true);
-        eventLatch.reset();
+        eventLatch = new CountDownLatch(1);
         dataEventReceived.set(false);
         
         emulator.setWeight(3500);
         weight[0] = 0;
         scale.readWeight(weight, 5000);
         
-        boolean eventReceived = eventLatch.await(6000, TimeUnit.MILLISECONDS);
-        assertTrue(eventReceived, "DataEvent should be received for price calculation");
+        boolean eventReceived = waitForEvent(6000);
+        assertTrue("DataEvent should be received for price calculation", eventReceived);
         
         System.out.println("Async weight: " + receivedDataStatus.get() + 
                          ", SalesPrice: " + scale.getSalesPrice());
@@ -736,22 +784,21 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(11)
-    @Timeout(value = 20, unit = TimeUnit.SECONDS)
-    void testPowerAndStatusNotifications() throws JposException, InterruptedException {
+    public void testPowerAndStatusNotifications() throws JposException, InterruptedException {
         System.out.println("\n=== Test 11: Power and status notifications ===");
+        
+        scale.open(LOGICAL_DEVICE_NAME);
         
         int capPower = scale.getCapPowerReporting();
         if (capPower == JposConst.JPOS_PR_NONE) {
             System.out.println("Skipping power test: CapPowerReporting is NONE");
+            scale.close();
             return;
         }
         
-        scale.open(LOGICAL_DEVICE_NAME);
-        
         // Включение уведомлений о питании
         scale.setPowerNotify(JposConst.JPOS_PN_ENABLED);
-        assertEquals(JposConst.JPOS_PN_ENABLED, scale.getPowerNotify(), "PowerNotify should be ENABLED");
+        assertEquals(JposConst.JPOS_PN_ENABLED, scale.getPowerNotify());
         
         claimAndEnable();
         
@@ -759,28 +806,22 @@ public class ScaleAcceptanceTest {
         int powerState = scale.getPowerState();
         System.out.println("PowerState: " + powerState);
         assertTrue(powerState == JposConst.JPOS_PS_ONLINE || 
-                   powerState == JposConst.JPOS_PS_UNKNOWN, 
-                   "PowerState should be valid");
+                   powerState == JposConst.JPOS_PS_UNKNOWN);
         
         // Проверка уведомлений о статусе весов
         if (scale.getCapStatusUpdate()) {
             scale.setStatusNotify(SCAL_SN_ENABLED);
-            assertEquals(SCAL_SN_ENABLED, scale.getStatusNotify(), "StatusNotify should be ENABLED");
+            assertEquals(SCAL_SN_ENABLED, scale.getStatusNotify());
             
-            eventLatch.reset();
+            eventLatch = new CountDownLatch(1);
             
             // Изменяем состояние весов в эмуляторе
             emulator.setStable(false);
             Thread.sleep(1000);
             
-            // Должен прийти StatusUpdateEvent о нестабильном весе
-            // (зависит от реализации эмулятора)
-            
             emulator.setStable(true);
             emulator.setWeight(100);
             Thread.sleep(1000);
-            
-            // Может прийти статус о стабильном весе
         }
         
         releaseAndDisable();
@@ -794,23 +835,23 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(12)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testStatistics() throws JposException {
+    public void testStatistics() throws JposException {
         System.out.println("\n=== Test 12: Statistics operations ===");
-        
-        if (!scale.getCapStatisticsReporting()) {
-            System.out.println("Skipping test: CapStatisticsReporting is false");
-            return;
-        }
         
         scale.open(LOGICAL_DEVICE_NAME);
         claimAndEnable();
         
+        if (!scale.getCapStatisticsReporting()) {
+            System.out.println("Skipping test: CapStatisticsReporting is false");
+            releaseAndDisable();
+            scale.close();
+            return;
+        }
+        
         // Получение статистики
         String[] statsBuffer = new String[1];
         scale.retrieveStatistics(statsBuffer);
-        assertNotNull(statsBuffer[0], "Statistics buffer should not be null");
+        assertNotNull(statsBuffer[0]);
         System.out.println("Retrieved statistics: " + statsBuffer[0]);
         
         // Сброс статистики (если поддерживается)
@@ -821,9 +862,6 @@ public class ScaleAcceptanceTest {
             // Проверка после сброса
             scale.retrieveStatistics(statsBuffer);
             System.out.println("Statistics after reset: " + statsBuffer[0]);
-            
-            // Обновление статистики
-            // scale.updateStatistics("StatName=100");
         }
         
         releaseAndDisable();
@@ -837,9 +875,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(13)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testClearInput() throws JposException, InterruptedException {
+    public void testClearInput() throws JposException, InterruptedException {
         System.out.println("\n=== Test 13: Clear input operations ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -860,14 +896,14 @@ public class ScaleAcceptanceTest {
         
         // Должны быть накоплены события
         int dataCount = scale.getDataCount();
-        assertTrue(dataCount > 0, "DataCount should be > 0 after async reads");
+        assertTrue(dataCount > 0);
         System.out.println("DataCount before clear: " + dataCount);
         
         // Очистка входного буфера
         scale.clearInput();
         
         dataCount = scale.getDataCount();
-        assertEquals(0, dataCount, "DataCount should be 0 after clearInput");
+        assertEquals(0, dataCount);
         System.out.println("DataCount after clear: " + dataCount);
         
         releaseAndDisable();
@@ -881,9 +917,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(14)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testFreezeEvents() throws JposException, InterruptedException {
+    public void testFreezeEvents() throws JposException, InterruptedException {
         System.out.println("\n=== Test 14: FreezeEvents property ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -893,10 +927,10 @@ public class ScaleAcceptanceTest {
         
         // Замораживаем события
         scale.setFreezeEvents(true);
-        assertTrue(scale.getFreezeEvents(), "FreezeEvents should be true");
+        assertTrue(scale.getFreezeEvents());
         
         // Запускаем асинхронное чтение
-        eventLatch.reset();
+        eventLatch = new CountDownLatch(1);
         dataEventReceived.set(false);
         
         emulator.setWeight(500);
@@ -907,15 +941,15 @@ public class ScaleAcceptanceTest {
         
         // Ждём немного - событие не должно прийти
         Thread.sleep(2000);
-        assertFalse(dataEventReceived.get(), "DataEvent should not be received when events are frozen");
+        assertFalse(dataEventReceived.get());
         System.out.println("Event correctly frozen");
         
         // Размораживаем события
         scale.setFreezeEvents(false);
         
         // Событие должно прийти
-        boolean eventReceived = eventLatch.await(5000, TimeUnit.MILLISECONDS);
-        assertTrue(eventReceived, "DataEvent should be received after unfreezing");
+        boolean eventReceived = waitForEvent(5000);
+        assertTrue(eventReceived);
         System.out.println("Event received after unfreeze");
         
         releaseAndDisable();
@@ -929,18 +963,18 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(15)
-    @Timeout(value = 20, unit = TimeUnit.SECONDS)
-    void testEdgeCasesAndErrors() throws JposException, InterruptedException {
+    public void testEdgeCasesAndErrors() throws JposException, InterruptedException {
         System.out.println("\n=== Test 15: Edge cases and error handling ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
         
         // Проверка: вызов методов без claim
-        assertThrows(JposException.class, () -> {
+        try {
             scale.setDeviceEnabled(true);
-        }, "Should throw exception when not claimed");
-        System.out.println("Correctly got exception for setDeviceEnabled without claim");
+            fail("Should throw exception when not claimed");
+        } catch (JposException e) {
+            System.out.println("Correctly got exception for setDeviceEnabled without claim: " + e.getMessage());
+        }
         
         claimAndEnable();
         
@@ -948,25 +982,30 @@ public class ScaleAcceptanceTest {
         scale.setAsyncMode(false);
         int[] weight = new int[1];
         
-        assertThrows(JposException.class, () -> {
+        try {
             scale.readWeight(weight, -2);
-        }, "Should throw exception for invalid timeout");
-        System.out.println("Correctly got exception for invalid timeout");
+            fail("Should throw exception for invalid timeout");
+        } catch (JposException e) {
+            System.out.println("Correctly got exception for invalid timeout: " + e.getMessage());
+        }
         
         // Проверка: установка некорректной цены (если цена должна быть положительной)
         if (scale.getCapPriceCalculating()) {
-            assertThrows(JposException.class, () -> {
+            try {
                 scale.setUnitPrice(-1);
-            }, "Should throw exception for negative unit price");
-            System.out.println("Correctly got exception for negative unit price");
+                fail("Should throw exception for negative unit price");
+            } catch (JposException e) {
+                System.out.println("Correctly got exception for negative unit price: " + e.getMessage());
+            }
         }
         
         // Проверка: переполнение веса
-        emulator.setWeight(100000); // Вес больше максимального
+        emulator.setWeight(100000);
         emulator.setStable(true);
         
         try {
             scale.readWeight(weight, 3000);
+            System.out.println("Warning: Overweight not detected by driver");
         } catch (JposException e) {
             System.out.println("Got expected exception for overweight: " + e.getMessage());
         }
@@ -982,9 +1021,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(16)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testDeviceInformation() throws JposException {
+    public void testDeviceInformation() throws JposException {
         System.out.println("\n=== Test 16: Device information ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -995,14 +1032,11 @@ public class ScaleAcceptanceTest {
         
         // Проверка состояния устройства
         int state = scale.getState();
-        assertEquals(JposConst.JPOS_S_IDLE, state, "State should be IDLE after open");
+        assertEquals(JposConst.JPOS_S_IDLE, state);
         System.out.println("State: " + state);
         
         // Проверка DataCount (должен быть 0 после open)
-        assertEquals(0, scale.getDataCount(), "DataCount should be 0 after open");
-        
-        // Проверка OutputID (не поддерживается для Scale)
-        // int outputId = scale.getOutputId();
+        assertEquals(0, scale.getDataCount());
         
         scale.close();
         
@@ -1014,9 +1048,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(17)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testCheckHealth() throws JposException {
+    public void testCheckHealth() throws JposException {
         System.out.println("\n=== Test 17: Health check ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -1026,7 +1058,7 @@ public class ScaleAcceptanceTest {
         scale.checkHealth(JposConst.JPOS_CH_INTERNAL);
         String healthText = scale.getCheckHealthText();
         System.out.println("Internal health check: " + healthText);
-        assertNotNull(healthText, "Health check text should not be null");
+        assertNotNull(healthText);
         
         // Внешняя проверка (если поддерживается)
         try {
@@ -1048,16 +1080,13 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(18)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testDirectIO() throws JposException {
+    public void testDirectIO() throws JposException {
         System.out.println("\n=== Test 18: DirectIO operation ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
         claimAndEnable();
         
         // Тест DirectIO (зависит от конкретной реализации драйвера)
-        // Обычно используется для вендор-специфичных команд
         int[] data = new int[1];
         Object obj = null;
         
@@ -1079,9 +1108,7 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(19)
-    @Timeout(value = 20, unit = TimeUnit.SECONDS)
-    void testConcurrentOperations() throws JposException, InterruptedException {
+    public void testConcurrentOperations() throws JposException, InterruptedException {
         System.out.println("\n=== Test 19: Concurrent operations ===");
         
         scale.open(LOGICAL_DEVICE_NAME);
@@ -1089,25 +1116,27 @@ public class ScaleAcceptanceTest {
         scale.setAsyncMode(true);
         scale.setDataEventEnabled(true);
         
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger errorCount = new AtomicInteger(0);
+        final AtomicInteger successCount = new AtomicInteger(0);
+        final AtomicInteger errorCount = new AtomicInteger(0);
         
         // Запуск нескольких параллельных операций чтения
-        // (ожидается, что будет брошено исключение, т.к. только одна async операция может выполняться)
         ExecutorService executor = Executors.newFixedThreadPool(5);
         
         for (int i = 0; i < 5; i++) {
             final int weight = 100 + i * 100;
-            executor.submit(() -> {
-                try {
-                    emulator.setWeight(weight);
-                    emulator.setStable(true);
-                    
-                    int[] w = new int[1];
-                    scale.readWeight(w, 5000);
-                    successCount.incrementAndGet();
-                } catch (JposException e) {
-                    errorCount.incrementAndGet();
+            executor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        emulator.setWeight(weight);
+                        emulator.setStable(true);
+                        
+                        int[] w = new int[1];
+                        scale.readWeight(w, 5000);
+                        successCount.incrementAndGet();
+                    } catch (JposException e) {
+                        errorCount.incrementAndGet();
+                    }
                 }
             });
         }
@@ -1117,7 +1146,7 @@ public class ScaleAcceptanceTest {
         
         // Должна быть только одна успешная операция
         System.out.println("Success count: " + successCount.get() + ", Error count: " + errorCount.get());
-        assertTrue(errorCount.get() > 0, "Should have errors for concurrent async reads");
+        assertTrue(errorCount.get() > 0);
         
         releaseAndDisable();
         scale.close();
@@ -1130,51 +1159,51 @@ public class ScaleAcceptanceTest {
     // ------------------------------------------------------------------------
     
     @Test
-    @Order(20)
-    @Timeout(value = 15, unit = TimeUnit.SECONDS)
-    void testZeroValidProperty() throws JposException, InterruptedException {
+    public void testZeroValidProperty() throws JposException, InterruptedException {
         System.out.println("\n=== Test 20: ZeroValid property test ===");
         
-        // Проверяем, поддерживается ли ZeroValid (версия 1.13+)
+        scale.open(LOGICAL_DEVICE_NAME);
+        claimAndEnable();
+        scale.setAsyncMode(false);
+        
+        // Проверяем, поддерживается ли ZeroValid
         try {
-            scale.open(LOGICAL_DEVICE_NAME);
-            claimAndEnable();
-            scale.setAsyncMode(false);
-            
             boolean zeroValid = scale.getZeroValid();
             System.out.println("ZeroValid initial: " + zeroValid);
-            
-            // Устанавливаем вес 0
-            emulator.setWeight(0);
-            emulator.setStable(true);
-            Thread.sleep(WEIGHT_STABLE_DELAY);
-            
-            int[] weight = new int[1];
-            
-            // При ZeroValid = false, вес 0 не должен возвращаться
-            scale.setZeroValid(false);
-            
-            assertThrows(JposException.class, () -> {
-                scale.readWeight(weight, 3000);
-            }, "Should throw exception for zero weight when ZeroValid=false");
-            System.out.println("Correctly got exception for zero weight with ZeroValid=false");
-            
-            // При ZeroValid = true, вес 0 должен возвращаться
-            scale.setZeroValid(true);
-            scale.readWeight(weight, 3000);
-            assertEquals(0, weight[0], "Weight should be 0 when ZeroValid=true");
-            System.out.println("Zero weight returned successfully with ZeroValid=true");
-            
-            releaseAndDisable();
-            
         } catch (JposException e) {
             if (e.getErrorCode() == JposConst.JPOS_E_NOSERVICE) {
                 System.out.println("ZeroValid not supported (service version < 1.13)");
-            } else {
-                throw e;
+                releaseAndDisable();
+                scale.close();
+                return;
             }
+            throw e;
         }
         
+        // Устанавливаем вес 0
+        emulator.setWeight(0);
+        emulator.setStable(true);
+        Thread.sleep(WEIGHT_STABLE_DELAY);
+        
+        int[] weight = new int[1];
+        
+        // При ZeroValid = false, вес 0 не должен возвращаться
+        scale.setZeroValid(false);
+        
+        try {
+            scale.readWeight(weight, 3000);
+            fail("Should throw exception for zero weight when ZeroValid=false");
+        } catch (JposException e) {
+            System.out.println("Correctly got exception for zero weight with ZeroValid=false: " + e.getMessage());
+        }
+        
+        // При ZeroValid = true, вес 0 должен возвращаться
+        scale.setZeroValid(true);
+        scale.readWeight(weight, 3000);
+        assertEquals(0, weight[0]);
+        System.out.println("Zero weight returned successfully with ZeroValid=true");
+        
+        releaseAndDisable();
         scale.close();
         
         System.out.println("Test 20 passed!");

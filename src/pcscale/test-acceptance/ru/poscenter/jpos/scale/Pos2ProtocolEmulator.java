@@ -1,4 +1,4 @@
-package ru.poscenter.jpos.scale;
+package ru.poscenter;
 
 import gnu.io.CommPortIdentifier;
 import gnu.io.PortInUseException;
