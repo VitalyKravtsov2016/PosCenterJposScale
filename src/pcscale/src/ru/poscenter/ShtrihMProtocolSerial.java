@@ -4,7 +4,7 @@ import java.io.IOException;
 import ru.poscenter.DeviceError;
 import ru.poscenter.scale.ScaleCommand;
 import ru.poscenter.scale.ScaleSerial;
-import ru.poscenter.port.SerialPort;
+import ru.poscenter.port.SerialPortInterface;
 import ru.poscenter.tools.Logger2;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
@@ -17,10 +17,10 @@ public class ShtrihMProtocolSerial {
 
     private static final int maxENQCount = 1;
     private int byteTimeout = 300;
-    private final SerialPort serialPort;
+    private final SerialPortInterface serialPort;
     private final Logger logger = LogManager.getLogger(ShtrihMProtocolSerial.class);
 
-    public ShtrihMProtocolSerial(SerialPort serialPort) {
+    public ShtrihMProtocolSerial(SerialPortInterface serialPort) {
         this.serialPort = serialPort;
     }
 
@@ -40,13 +40,13 @@ public class ShtrihMProtocolSerial {
 
         ScaleCommand reply;
         int enq = requestCommand();
-        if (enq == SerialPort.ACK) { // Устройство в режиме формирования ответа
+        if (enq == SerialPortInterface.ACK) { // Устройство в режиме формирования ответа
             // Ждем ответ, который готовит устройство
             reply = readReply(cmd.timeout);
             enq = requestCommand();
         }
 
-        if (enq == SerialPort.NAK) { // устройство в режиме ожидания команды
+        if (enq == SerialPortInterface.NAK) { // устройство в режиме ожидания команды
             writeCommand(cmd);
             reply = readReply(cmd.timeout);
             return reply;
@@ -77,7 +77,7 @@ public class ShtrihMProtocolSerial {
                 + // Байты данных
                 1 // Контрольная сумма LRC
                 ];
-        buffer[0] = SerialPort.STX; // STX
+        buffer[0] = SerialPortInterface.STX; // STX
         buffer[1] = (byte) (dataLen + 1);// Длина
         buffer[2] = cmd.cmd;// Команда
         if (dataLen > 0) {
@@ -92,9 +92,9 @@ public class ShtrihMProtocolSerial {
                 serialPort.write(buffer);
                 serialPort.setTimeout(byteTimeout);
                 confirmation = serialPort.readByte();
-                if (confirmation == SerialPort.ACK) {
+                if (confirmation == SerialPortInterface.ACK) {
                     return;
-                } else if (confirmation == SerialPort.NAK) { // Команда не принята
+                } else if (confirmation == SerialPortInterface.NAK) { // Команда не принята
                     // устройством
                     attempts--;
                     continue;
@@ -118,7 +118,7 @@ public class ShtrihMProtocolSerial {
             while (true) {
                 serialPort.setTimeout(timeout);
                 stx = serialPort.readByte();
-                if (stx == SerialPort.STX) {
+                if (stx == SerialPortInterface.STX) {
                     break;
                 }
             }
@@ -145,7 +145,7 @@ public class ShtrihMProtocolSerial {
     protected int requestCommand() throws Exception {
         int b = 0;
         for (int i = 0; i < maxENQCount; i++) {
-            serialPort.write(SerialPort.ENQ);
+            serialPort.write(SerialPortInterface.ENQ);
             try {
                 serialPort.setTimeout(byteTimeout);
                 b = serialPort.readByte();

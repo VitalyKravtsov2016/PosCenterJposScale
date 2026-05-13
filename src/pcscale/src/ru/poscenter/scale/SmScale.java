@@ -7,7 +7,7 @@ import java.util.Enumeration;
 import java.util.Vector;
 import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
@@ -43,7 +43,7 @@ public class SmScale {
 
     public String getDefaultPortName() {
         String result = "COM1";
-        Vector<String> portNames = GnuSerialPort.getPortList();
+        Vector<String> portNames = JSerialPort.getPortList();
         if (portNames.size() > 0) {
             result = portNames.get(0);
         }

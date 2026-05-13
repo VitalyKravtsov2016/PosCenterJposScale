@@ -11,7 +11,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 import ru.poscenter.IDevice;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import ru.poscenter.scale.SmScale;
 import ru.poscenter.scale.PropertyPage;
 import javax.swing.ButtonGroup;
@@ -48,7 +48,7 @@ public class ConnectionPage extends PropertyPage {
 
     public void updatePortList() {
         String portName = (String) cbPortName.getSelectedItem();
-        ComboBoxModel model = new DefaultComboBoxModel(GnuSerialPort.getPortList().toArray());
+        ComboBoxModel model = new DefaultComboBoxModel(JSerialPort.getPortList().toArray());
         cbPortName.setModel(model);
         cbPortName.setSelectedItem(portName);
     }

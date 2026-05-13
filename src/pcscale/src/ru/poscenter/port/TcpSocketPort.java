@@ -11,7 +11,7 @@ import org.apache.logging.log4j.LogManager;
 /**
  * @author V.Kravtsov
  */
-public class TcpSocketPort implements SerialPort {
+public class TcpSocketPort implements SerialPortInterface {
 
     private static Logger logger = LogManager.getLogger(TcpSocketPort.class);
 

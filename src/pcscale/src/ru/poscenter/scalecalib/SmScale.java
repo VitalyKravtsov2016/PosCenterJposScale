@@ -12,7 +12,7 @@ import ru.poscenter.scale.Pos2Serial;
 import ru.poscenter.scale.ChannelParams;
 import ru.poscenter.scale.DeviceMetrics;
 import ru.poscenter.scale.CalibrationStatus;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -43,7 +43,7 @@ public class SmScale {
 
     public String getDefaultPortName() {
         String result = "COM1";
-        Vector<String> portNames = GnuSerialPort.getPortList();
+        Vector<String> portNames = JSerialPort.getPortList();
         if (portNames.size() > 0) {
             result = portNames.get(0);
         }

@@ -28,7 +28,7 @@ import javax.swing.border.Border;
 
 import org.eclipse.wb.swing.FocusTraversalOnArray;
 
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import ru.poscenter.scale.FindDlg;
 import ru.poscenter.scale.PropertyPage;
 import ru.poscenter.scale.SmScale;
@@ -166,7 +166,7 @@ public class Page1 extends PropertyPage {
 
     public void updatePortList() {
         String portName = (String) cbPortName.getSelectedItem();
-        ComboBoxModel model = new DefaultComboBoxModel(GnuSerialPort.getPortList()
+        ComboBoxModel model = new DefaultComboBoxModel(JSerialPort.getPortList()
                 .toArray());
         cbPortName.setModel(model);
         cbPortName.setSelectedItem(portName);

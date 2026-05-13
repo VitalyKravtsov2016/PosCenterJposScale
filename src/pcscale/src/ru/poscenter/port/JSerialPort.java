@@ -9,32 +9,34 @@ import java.util.LinkedList;
 import java.util.Vector;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
-import gnu.io.UnsupportedCommOperationException;
+
+import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortInvalidPortException;
 
 import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
 import ru.poscenter.tools.Tools;
 import ru.poscenter.tools.Logger2;
-import ru.poscenter.port.SerialPort;
+import ru.poscenter.port.SerialPortInterface;
 
-public class GnuSerialPort implements SerialPort {
+public class JSerialPort implements SerialPortInterface {
 
-    private final Logger logger = LogManager.getLogger(GnuSerialPort.class);
+    private final Logger logger = LogManager.getLogger(JSerialPort.class);
 
     private final int bufferSize = 2048;
-    private gnu.io.SerialPort port;
-    public String appName = GnuSerialPort.class.getName();
+    private SerialPort port;
+    public String appName = JSerialPort.class.getName();
     public String portName = "COM1";
     public int baudRate = 115200;
-    public int dataBits = gnu.io.SerialPort.DATABITS_8;
-    public int stopBits = gnu.io.SerialPort.STOPBITS_1;
-    public int parity = gnu.io.SerialPort.PARITY_NONE;
+    public int dataBits = 8;
+    public int stopBits = SerialPort.ONE_STOP_BIT;
+    public int parity = SerialPort.NO_PARITY;
     public int openTimeout = 1000;
     public long idleTimeoutMS = 0;
     public int idleTimeoutNS = 1;
     private int readTimeout = 1000;
 
-    public GnuSerialPort() {
+    public JSerialPort() {
     }
 
     public void setSerialParams(String appName, String portName, int baudrate,
@@ -48,17 +50,6 @@ public class GnuSerialPort implements SerialPort {
         this.openTimeout = openTimeout;
     }
 
-    private void listPortNames() {
-        logger.debug("listPortNames");
-        Enumeration ports = gnu.io.CommPortIdentifier.getPortIdentifiers();
-        while (ports.hasMoreElements()) {
-            gnu.io.CommPortIdentifier port = (gnu.io.CommPortIdentifier) ports.nextElement();
-            if (port.getPortType() == gnu.io.CommPortIdentifier.PORT_SERIAL) {
-                logger.debug("PORT: " + port.getName());
-            }
-        }
-    }
-
     public void open() throws Exception {
         open(openTimeout);
     }
@@ -70,38 +61,44 @@ public class GnuSerialPort implements SerialPort {
             return;
         }
         logger.debug("open(" + portName + ")");
+
+        long expTime = System.currentTimeMillis() + openTimeout;
+        for (;;) {
+            if (openPort())  {
+                break;
+            }
+            if (System.currentTimeMillis() > expTime) {
+                String errorText = IDevice.TEXT_ERROR_NOTSUCHPORT + ", " + portName;
+                throw new DeviceError(IDevice.ERROR_NOSUCHPORT, errorText);
+            }
+            Thread.sleep(100);
+        }
+    }
+
+    public boolean openPort() throws Exception {
         try {
-            gnu.io.CommPortIdentifier portIdentifier;
-            portIdentifier = gnu.io.CommPortIdentifier.getPortIdentifier(portName);
-            if (portIdentifier == null) {
-                throw new gnu.io.NoSuchPortException();
-            }
-            port = (gnu.io.SerialPort) portIdentifier.open(appName,
-                    openTimeout);
+            port = SerialPort.getCommPort(portName);
             if (port == null) {
-                throw new gnu.io.NoSuchPortException();
+                logger.error("SerialPort.getCommPort returned null");
+                return false;
             }
-            port.setSerialPortParams(this.baudRate, this.dataBits,
-                    this.stopBits, this.parity);
-            port.setInputBufferSize(1024);
-            port.setOutputBufferSize(1024);
-            port.setFlowControlMode(gnu.io.SerialPort.FLOWCONTROL_NONE);
-            port.enableReceiveTimeout(readTimeout);
-        } catch (gnu.io.NoSuchPortException e) {
-            String errorText = IDevice.TEXT_ERROR_NOTSUCHPORT + ", " + portName;
-            throw new DeviceError(IDevice.ERROR_NOSUCHPORT, errorText);
+            port.openPort(0, 1024, 1024);
+            port.setComPortParameters(baudRate, dataBits, stopBits, parity);
+            port.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
+            return true;
+        } catch (SerialPortInvalidPortException e) {
+            return false;
         }
     }
 
     public void setTimeout(int timeout) throws Exception {
-        port.enableReceiveTimeout(timeout);
         readTimeout = timeout;
     }
 
     public void close() {
         logger.debug("close()");
         if (isOpened()) {
-            port.close();
+            port.closePort();
             port = null;
         }
         logger.debug("close: OK");
@@ -111,12 +108,7 @@ public class GnuSerialPort implements SerialPort {
         if (!isOpened()) {
             return;
         }
-
-        if (timeout <= 0) {
-            port.disableReceiveTimeout();
-        } else {
-            port.enableReceiveTimeout(timeout);
-        }
+        this.readTimeout = timeout;
     }
 
     public int doReadByte() throws Exception {
@@ -152,7 +144,7 @@ public class GnuSerialPort implements SerialPort {
         return data[0];
     }
 
-    public void read(GnuSerialPort.Buffer out, int len, int timeout) throws Exception {
+    public void read(JSerialPort.Buffer out, int len, int timeout) throws Exception {
         if (timeout < 100) {
             timeout = 100;
         }
@@ -160,7 +152,7 @@ public class GnuSerialPort implements SerialPort {
         out.data = readBytes(len);
     }
 
-    public void read(GnuSerialPort.Buffer out, int timeout) throws Exception {
+    public void read(JSerialPort.Buffer out, int timeout) throws Exception {
         read(out, -1, timeout);
     }
 
@@ -178,11 +170,11 @@ public class GnuSerialPort implements SerialPort {
         write(in.array());
     }
 
-    public void write(GnuSerialPort.Buffer in) throws Exception {
+    public void write(JSerialPort.Buffer in) throws Exception {
         write(in, false);
     }
 
-    public void write(GnuSerialPort.Buffer in, boolean flush) throws Exception {
+    public void write(JSerialPort.Buffer in, boolean flush) throws Exception {
         Logger2.logTx(logger, in.data);
 
         open();
@@ -194,11 +186,11 @@ public class GnuSerialPort implements SerialPort {
     }
 
     public void writeBytes(byte[] a, boolean flush) throws Exception {
-        write(new GnuSerialPort.Buffer(a), flush);
+        write(new JSerialPort.Buffer(a), flush);
     }
 
     public void writeByte(int b, boolean flush) throws Exception {
-        write(new GnuSerialPort.Buffer(new byte[]{(byte) b}), flush);
+        write(new JSerialPort.Buffer(new byte[]{(byte) b}), flush);
     }
 
     public void write(int b) throws Exception {
@@ -259,28 +251,29 @@ public class GnuSerialPort implements SerialPort {
         }
     }
 
-    public static Vector<String> getDefaultPortList() {
-        Vector<String> names = new Vector<String>();
-        String osname = System.getProperty("os.name");
-        String prefix = "/dev/ttyS";
-        if (osname.startsWith("Windows")) {
-            prefix = "COM";
+    private void listPortNames() {
+        logger.debug("listPortNames");
+        SerialPort[] ports = SerialPort.getCommPorts();
+        for (SerialPort port : ports) {
+            logger.debug("PORT: " + port.getSystemPortName());
         }
-        for (int i = 1; i < 33; i++) {
-            names.add(prefix + String.valueOf(i));
-        }
-        return names;
     }
 
     public static Vector<String> getPortList() {
         Vector<String> names = new Vector<String>();
-        Enumeration e = gnu.io.CommPortIdentifier.getPortIdentifiers();
-        while (e.hasMoreElements()) {
-            gnu.io.CommPortIdentifier port = (gnu.io.CommPortIdentifier) e.nextElement();
-            if (port.getPortType() == gnu.io.CommPortIdentifier.PORT_SERIAL) {
-                names.add(port.getName());
-            }
+        SerialPort[] ports = SerialPort.getCommPorts();
+        for (SerialPort port : ports) {
+            names.add(port.getSystemPortName());
         }
         return names;
+    }
+
+    public void handleException(Exception e) throws Exception {
+        if (e instanceof java.io.IOException) {
+            throw new DeviceError(IDevice.ERROR_NOLINK, IDevice.TEXT_ERROR_NOLINK);
+        }
+        if (e instanceof SerialPortInvalidPortException) {
+            throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
+        }
     }
 }

@@ -3,16 +3,29 @@ package ru.poscenter.port;
 /**
  * @author V.Kravtsov
  */
-public interface SerialPort 
-{
+public interface SerialPortInterface {
+
+    // Parity Values
+
+    static final public int NO_PARITY = 0;
+    static final public int ODD_PARITY = 1;
+    static final public int EVEN_PARITY = 2;
+    static final public int MARK_PARITY = 3;
+    static final public int SPACE_PARITY = 4;
+
+    // Number of Stop Bits
+    static final public int ONE_STOP_BIT = 1;
+    static final public int ONE_POINT_FIVE_STOP_BITS = 2;
+    static final public int TWO_STOP_BITS = 3;
+
     void open() throws Exception;
-    
+
     void open(int openTimeout) throws Exception;
 
     void close();
 
     boolean isOpened();
-    
+
     int readByte() throws Exception;
 
     byte[] readBytes(int len) throws Exception;

@@ -4,7 +4,7 @@ import java.util.Vector;
 
 import ru.poscenter.IDevice;
 import ru.poscenter.tools.StringParams;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -137,7 +137,7 @@ public class DeviceFindSingle implements Runnable {
 
     public void updateItems() {
         stop();
-        Vector ports = GnuSerialPort.getPortList();
+        Vector ports = JSerialPort.getPortList();
         items.clear();
         for (int i = 0; i < ports.size(); i++) {
             DeviceItem item = new DeviceItem((String) ports.get(i));

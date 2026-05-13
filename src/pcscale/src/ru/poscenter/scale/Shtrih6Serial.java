@@ -2,7 +2,7 @@ package ru.poscenter.scale;
 
 import ru.poscenter.EquipmentTools;
 import ru.poscenter.IDevice;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 
 public class Shtrih6Serial extends ScaleSerial {
 

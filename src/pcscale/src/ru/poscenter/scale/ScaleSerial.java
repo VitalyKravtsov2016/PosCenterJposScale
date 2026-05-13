@@ -6,14 +6,14 @@ import org.apache.logging.log4j.LogManager;
 import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
 import ru.poscenter.EquipmentTools;
-import ru.poscenter.port.SerialPort;
+import ru.poscenter.port.SerialPortInterface;
 import ru.poscenter.tools.StringParams;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import ru.poscenter.port.TcpSocketPort;
 
 public class ScaleSerial implements IScale, IDevice {
 
-    private SerialPort serialPort = null;
+    private SerialPortInterface serialPort = null;
     protected StringParams params = new StringParams();
     private final Logger logger = LogManager.getLogger(ScaleSerial.class);
 
@@ -105,24 +105,24 @@ public class ScaleSerial implements IScale, IDevice {
         return value;
     }
 
-    public SerialPort getSerialPort() throws Exception {
+    public SerialPortInterface getSerialPort() throws Exception {
         if (serialPort == null) {
             serialPort = createSerialPort();
         }
         return serialPort;
     }
 
-    private SerialPort createSerialPort() throws Exception {
+    private SerialPortInterface createSerialPort() throws Exception {
         logger.debug("createSerialPort()");
 
         int portType = params.getInt(IDevice.PARAM_PORTTYPE);
         if (portType == IDevice.PARAM_PORTTYPE_SERIAL) {
-            GnuSerialPort port = new GnuSerialPort();
+            JSerialPort port = new JSerialPort();
             port.portName = params.get(IDevice.PARAM_PORTNAME);
             port.baudRate = params.getInt(IDevice.PARAM_BAUDRATE, 9600);
-            port.dataBits = params.getInt(IDevice.PARAM_DATABITS, gnu.io.SerialPort.DATABITS_8);
-            port.stopBits = params.getInt(IDevice.PARAM_STOPBITS, gnu.io.SerialPort.STOPBITS_1);
-            port.parity = params.getInt(IDevice.PARAM_PARITY, gnu.io.SerialPort.PARITY_NONE);
+            port.dataBits = params.getInt(IDevice.PARAM_DATABITS, 8);
+            port.stopBits = params.getInt(IDevice.PARAM_STOPBITS, SerialPortInterface.ONE_STOP_BIT);
+            port.parity = params.getInt(IDevice.PARAM_PARITY, SerialPortInterface.NO_PARITY);
             port.appName = params.get(IDevice.PARAM_APPNAME, "");
             port.openTimeout = params.getInt(IDevice.PARAM_OPEN_TIMEOUT, 1000);
             return port;

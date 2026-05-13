@@ -1,7 +1,7 @@
 package ru.poscenter;
 
 import ru.poscenter.tools.Tools;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 
 public class EquipmentTools {
 	public static int convertDecToBCD(int dec) {

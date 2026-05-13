@@ -5,7 +5,7 @@
  */
 package ru.poscenter.test;
 
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import jpos.Scale;
 
 /**
@@ -19,7 +19,7 @@ public class GnuSerialPortTest {
     
     public void testOpen() {
         System.out.print("testOpen...");
-        GnuSerialPort port = new GnuSerialPort();
+        JSerialPort port = new JSerialPort();
         port.portName = portName;
         port.appName = "GnuSerialPortTest";
         try {
@@ -36,7 +36,7 @@ public class GnuSerialPortTest {
 
     public void testOpenTimeout1000() {
         System.out.print("testOpenTimeout1000...");
-        GnuSerialPort port = new GnuSerialPort();
+        JSerialPort port = new JSerialPort();
         port.portName = portName;
         port.appName = "GnuSerialPortTest";
         try {

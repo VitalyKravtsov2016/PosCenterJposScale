@@ -3,7 +3,7 @@ package ru.poscenter.scale;
 import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
 import ru.poscenter.ShtrihMProtocolSerial;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
@@ -490,27 +490,11 @@ public class Pos2Serial extends ScaleSerial {
         logger.debug(CommandSeparator);
         logger.debug(getCommandText(command.cmd));
 
-        try {
-            reply = getProtocol().execCommand(command);
-            int rc = reply.readByte();
-            logger.debug(CommandSeparator);
-            if (rc != 0) {
-                throw new DeviceError(rc, getErrorText(rc));
-            }
-        } catch(Exception e) {
-            if (e instanceof java.io.IOException) {
-                throw new DeviceError(IDevice.ERROR_NOLINK, IDevice.TEXT_ERROR_NOLINK);
-            }
-            if (e instanceof gnu.io.NoSuchPortException) {
-                throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
-            }
-            if (e instanceof gnu.io.PortInUseException) {
-                throw new DeviceError(IDevice.ERROR_PORTINUSE, IDevice.TEXT_ERROR_PORTINUSE);
-            }
-            if (e instanceof gnu.io.UnsupportedCommOperationException) {
-                throw new DeviceError(IDevice.ERROR_UNSUPPORT, IDevice.TEXT_ERROR_UNSUPPORT);
-            }
-            throw e;
+        reply = getProtocol().execCommand(command);
+        int rc = reply.readByte();
+        logger.debug(CommandSeparator);
+        if (rc != 0) {
+            throw new DeviceError(rc, getErrorText(rc));
         }
     }
 

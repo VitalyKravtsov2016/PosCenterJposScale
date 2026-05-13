@@ -15,7 +15,7 @@ import ru.poscenter.DeviceError;
 import ru.poscenter.IDevice;
 import ru.poscenter.jpos.JposPropertyReader;
 import ru.poscenter.jpos.JposUtils;
-import ru.poscenter.port.GnuSerialPort;
+import ru.poscenter.port.JSerialPort;
 import ru.poscenter.scale.DeviceMetrics;
 import ru.poscenter.scale.EScale;
 import ru.poscenter.scale.IScale;
