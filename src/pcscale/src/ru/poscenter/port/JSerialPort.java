@@ -82,7 +82,10 @@ public class JSerialPort implements SerialPortInterface {
                 logger.error("SerialPort.getCommPort returned null");
                 return false;
             }
-            port.openPort(0, 1024, 1024);
+            if (!port.openPort(0, 1024, 1024)){
+                port = null;
+                return false;
+            }
             port.setComPortParameters(baudRate, dataBits, stopBits, parity);
             port.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
             return true;

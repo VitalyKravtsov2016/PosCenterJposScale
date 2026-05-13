@@ -291,8 +291,9 @@ public class Pos2Serial extends ScaleSerial {
         command.write(getPassword(), charsetName);
         execute(command);
         int status = reply.readShort();
-        int weight = reply.readInt();
-        int tare = reply.readShort();
+        int multiplier = (int)Math.round(Math.pow(10, channelParams.power));
+        int weight = reply.readInt() * multiplier;
+        int tare = reply.readShort() * multiplier;
         this.weight = new ScaleWeight(weight, tare, new ScaleStatus(status));
         logger.debug("weight = " + weight + ", tare = " + tare + ", flags = " + status);
     }

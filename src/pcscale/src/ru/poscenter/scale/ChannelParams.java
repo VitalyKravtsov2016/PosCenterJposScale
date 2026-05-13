@@ -5,8 +5,8 @@ import ru.poscenter.tools.BitUtils;
 public class ChannelParams 
 {
 	public int flags;
-	public byte decimalPoint; // Положение десятичной точки (1 байт) : Диапазон 0..6.
-	public byte power; 		  // Степень (1 байт), диапазон: -127..128.
+	public byte decimalPoint;  // Положение десятичной точки (1 байт) : Диапазон 0..6.
+	public byte power;         // Степень (1 байт), диапазон: -127..128.
 	public int maxWeigth;
 	public int minWeigth;
 	public int maxTare;
