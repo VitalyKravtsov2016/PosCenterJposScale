@@ -6,7 +6,7 @@
       
 ********************************************************************************
 
-  May, 14 2026 11:20
+  May, 14 2026 11:45
   deviceServiceVersion = 1014005
 
   [+] Serial port library changed from nrjavaserial to jSerialComm 
