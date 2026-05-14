@@ -5,8 +5,8 @@ import ru.poscenter.tools.BitUtils;
 public class ChannelParams 
 {
 	public int flags;
-	public byte decimalPoint;  // Положение десятичной точки (1 байт) : Диапазон 0..6.
-	public byte power;         // Степень (1 байт), диапазон: -127..128.
+	public int decimalPoint;  // Положение десятичной точки (1 байт) : Диапазон 0..6.
+	public int power;         // Степень (1 байт), диапазон: -127..128.
 	public int maxWeigth;
 	public int minWeigth;
 	public int maxTare;
@@ -15,6 +15,11 @@ public class ChannelParams
 	public int pointCount;
 	public int calibCount;
 
+        public int convertWeight(int weight){
+            double multiplier = Math.pow(10, power + 3);
+            return (int)Math.round(weight * multiplier);
+        }
+        
 	public double getRange(int index){
 		return getRate() * range[index];
 	}
@@ -108,7 +113,7 @@ public class ChannelParams
     /**
      * @param power the power to set
      */
-    public void setPower(byte power) {
+    public void setPower(int power) {
         this.power = power;
     }
 

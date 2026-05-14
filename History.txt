@@ -6,8 +6,8 @@
       
 ********************************************************************************
 
-  May, 14 2026 15:30
-  deviceServiceVersion = 1014006
+  May, 14 2026 16:30
+  deviceServiceVersion = 1014007
 
   [-] Weight and tare are corrected by multiplier from weight channel parameters
   
