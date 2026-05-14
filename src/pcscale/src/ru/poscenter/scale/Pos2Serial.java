@@ -14,33 +14,33 @@ public class Pos2Serial extends ScaleSerial {
 
     // //////////////////////////////////////////////////////////////////////////
     // Scale command code constants
-    public static final byte CMD_ZERO = (byte) 0x30;
-    public static final byte CMD_TARA = (byte) 0x31;
-    public static final byte CMD_SET_TARA = (byte) 0x32;
-    public static final byte CMD_READ_WEIGHT = (byte) 0x3A;
-    public static final byte CMD_READ_DEVICE_METRICS = (byte) 0xFC;
-    public static final byte CMD_WRITE_MODE = (byte) 0x07;
-    public static final byte CMD_SEND_KEY = (byte) 0x08;
-    public static final byte CMD_LOCK_KEYBOARD = (byte) 0x09;
-    public static final byte CMD_READ_SCALE_MODE = (byte) 0x12;
-    public static final byte CMD_WRITE_PARAM = (byte) 0x14;
-    public static final byte CMD_READ_PARAM = (byte) 0x15;
-    public static final byte CMD_WRITE_ADMIN_PASSWORD = (byte) 0x16;
-    public static final byte CMD_WRITE_CALIB_POINT = (byte) 0x70;
-    public static final byte CMD_READ_CALIB_POINT = (byte) 0x71;
-    public static final byte CMD_START_CALIBRATION = (byte) 0x72;
-    public static final byte CMD_READ_CALIB_STATUS = (byte) 0x73;
-    public static final byte CMD_STOP_CALIBRATION = (byte) 0x74;
-    public static final byte CMD_READ_WEIGHT_ADC = (byte) 0x75;
-    public static final byte CMD_READ_KBD_STATUS = (byte) 0x90;
-    public static final byte CMD_READ_CHANNEL_COUNT = (byte) 0xE5;
-    public static final byte CMD_SELECT_CHANNEL = (byte) 0xE6;
-    public static final byte CMD_ENABLE_CHANNEL = (byte) 0xE7;
-    public static final byte CMD_READ_CHANNEL_PARAMS = (byte) 0xE8;
-    public static final byte CMD_WRITE_CHANNEL_PARAMS = (byte) 0xE9;
-    public static final byte CMD_READ_CHANNEL_NUMBER = (byte) 0xEA;
-    public static final byte CMD_RESET_CHANNEL = (byte) 0xEF;
-    public static final byte CMD_RESET_DEVICE = (byte) 0xF0;
+    public static final int CMD_ZERO = 0x30;
+    public static final int CMD_TARA = 0x31;
+    public static final int CMD_SET_TARA = 0x32;
+    public static final int CMD_READ_WEIGHT = 0x3A;
+    public static final int CMD_READ_DEVICE_METRICS = 0xFC;
+    public static final int CMD_WRITE_MODE = 0x07;
+    public static final int CMD_SEND_KEY = 0x08;
+    public static final int CMD_LOCK_KEYBOARD = 0x09;
+    public static final int CMD_READ_SCALE_MODE = 0x12;
+    public static final int CMD_WRITE_PARAM = 0x14;
+    public static final int CMD_READ_PARAM = 0x15;
+    public static final int CMD_WRITE_ADMIN_PASSWORD = 0x16;
+    public static final int CMD_WRITE_CALIB_POINT = 0x70;
+    public static final int CMD_READ_CALIB_POINT = 0x71;
+    public static final int CMD_START_CALIBRATION = 0x72;
+    public static final int CMD_READ_CALIB_STATUS = 0x73;
+    public static final int CMD_STOP_CALIBRATION = 0x74;
+    public static final int CMD_READ_WEIGHT_ADC = 0x75;
+    public static final int CMD_READ_KBD_STATUS = 0x90;
+    public static final int CMD_READ_CHANNEL_COUNT = 0xE5;
+    public static final int CMD_SELECT_CHANNEL = 0xE6;
+    public static final int CMD_ENABLE_CHANNEL = 0xE7;
+    public static final int CMD_READ_CHANNEL_PARAMS = 0xE8;
+    public static final int CMD_WRITE_CHANNEL_PARAMS = 0xE9;
+    public static final int CMD_READ_CHANNEL_NUMBER = 0xEA;
+    public static final int CMD_RESET_CHANNEL = 0xEF;
+    public static final int CMD_RESET_DEVICE = 0xF0;
 
     // //////////////////////////////////////////////////////////////////////////
     // Scale mode constants
@@ -291,7 +291,7 @@ public class Pos2Serial extends ScaleSerial {
         command.write(getPassword(), charsetName);
         execute(command);
         int status = reply.readShort();
-        int multiplier = (int)Math.round(Math.pow(10, channelParams.power));
+        int multiplier = (int)Math.round(Math.pow(10, channelParams.power + 3));
         int weight = reply.readInt() * multiplier;
         int tare = reply.readShort() * multiplier;
         this.weight = new ScaleWeight(weight, tare, new ScaleStatus(status));
@@ -299,7 +299,7 @@ public class Pos2Serial extends ScaleSerial {
     }
 
     public void writeCalibrationPoint(int number, int weight) throws Exception {
-        byte cmd = CMD_WRITE_CALIB_POINT;
+        int cmd = CMD_WRITE_CALIB_POINT;
         int timeout = getCommandTimeout(cmd);
         ScaleCommand command = new ScaleCommand(cmd, timeout);
         command.write(getPassword(), charsetName);
@@ -313,7 +313,7 @@ public class Pos2Serial extends ScaleSerial {
     }
 
     public void readCalibrationPoint(int number) throws Exception {
-        byte cmd = CMD_READ_CALIB_POINT;
+        int cmd = CMD_READ_CALIB_POINT;
         int timeout = getCommandTimeout(CMD_READ_CALIB_POINT);
         ScaleCommand command = new ScaleCommand(cmd, timeout);
         command.write(getPassword(), charsetName);
@@ -373,7 +373,7 @@ public class Pos2Serial extends ScaleSerial {
     }
 
     public void readChannelCount() throws Exception {
-        byte cmd = CMD_READ_CHANNEL_COUNT;
+        int cmd = CMD_READ_CHANNEL_COUNT;
         int timeout = getCommandTimeout(cmd);
         ScaleCommand command = new ScaleCommand(cmd, timeout);
         execute(command);
@@ -397,9 +397,10 @@ public class Pos2Serial extends ScaleSerial {
         ScaleCommand command = createCommand(CMD_READ_CHANNEL_PARAMS);
         command.write(index, 1);
         execute(command);
+        ChannelParams channelParams = new ChannelParams();
         channelParams.setFlags(reply.readShort());
         channelParams.setDecimalPoint((byte) reply.readByte());
-        channelParams.setPower((byte) reply.readByte());
+        channelParams.setPower((byte) reply.readByteSigned());
         channelParams.setMaxWeigth(reply.readShort());
         channelParams.setMinWeigth(reply.readShort());
         channelParams.setMaxTare(reply.readShort());
@@ -413,6 +414,8 @@ public class Pos2Serial extends ScaleSerial {
         channelParams.resolution[3] = reply.readByte();
         channelParams.setPointCount(reply.readByte());
         channelParams.setCalibCount(reply.readByte());
+        logger.debug(channelParams.toString());
+        this.channelParams = channelParams;
     }
 
     public DeviceMetrics getDeviceMetrics() {
@@ -482,7 +485,7 @@ public class Pos2Serial extends ScaleSerial {
         case 0xEF: return "Перезапуск текущего весовой канал";
         case 0xF0: return "Сброс";
         case 0xFC: return "Получить тип устройства";
-        default: return String.valueOf(cmd);
+        default: return "Неизвестная команда, " + String.valueOf(cmd);
         }
     }
 
@@ -493,23 +496,23 @@ public class Pos2Serial extends ScaleSerial {
 
         reply = getProtocol().execCommand(command);
         int rc = reply.readByte();
-        logger.debug(CommandSeparator);
+        //logger.debug(CommandSeparator);
         if (rc != 0) {
             throw new DeviceError(rc, getErrorText(rc));
         }
     }
 
-    protected ScaleCommand createCommand(byte cmd) {
+    protected ScaleCommand createCommand(int cmd) {
         int timeout = getCommandTimeout(cmd);
         ScaleCommand command = new ScaleCommand(cmd, timeout);
         return command;
     }
 
-    protected void execute(byte cmd) throws Exception {
+    protected void execute(int cmd) throws Exception {
         execute(createCommand(cmd));
     }
 
-    protected void executePsw(byte cmd) throws Exception {
+    protected void executePsw(int cmd) throws Exception {
         ScaleCommand command = createCommand(cmd);
         command.write(getPassword(), charsetName);
         execute(command);

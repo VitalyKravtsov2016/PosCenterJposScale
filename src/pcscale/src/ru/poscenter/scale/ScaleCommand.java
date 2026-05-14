@@ -8,12 +8,12 @@ import ru.poscenter.EquipmentTools;
 
 public class ScaleCommand {
 
-    public ScaleCommand(byte cmd, int timeout) {
+    public ScaleCommand(int cmd, int timeout) {
         this.cmd = cmd;
         this.timeout = timeout;
     }
 
-    public final byte cmd;
+    public final int cmd;
     public final int timeout;
 
     public byte crc;
@@ -23,7 +23,7 @@ public class ScaleCommand {
     private ByteArrayOutputStream out = new ByteArrayOutputStream();
 
     public String toString() {
-        String s = String.format("Команда - %02X, ", this.cmd);
+        String s = String.format("Команда - %02X, ", (byte)this.cmd);
         s += String.format("длина - %d, данные - [", (this.data.length + 1));
         for (int i = 0; i < this.data.length; i++) {
             s += String.format(" %02X", this.data[i]);
@@ -87,6 +87,10 @@ public class ScaleCommand {
         return B;
     }
 
+    public int readByteSigned() {
+        return (byte) in.read();
+    }
+    
     public int readShort() throws Exception {
         int ch2 = readByte();
         int ch1 = readByte();

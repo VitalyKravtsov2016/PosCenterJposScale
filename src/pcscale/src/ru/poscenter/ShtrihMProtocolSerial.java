@@ -79,7 +79,7 @@ public class ShtrihMProtocolSerial {
                 ];
         buffer[0] = SerialPortInterface.STX; // STX
         buffer[1] = (byte) (dataLen + 1);// Длина
-        buffer[2] = cmd.cmd;// Команда
+        buffer[2] = (byte) cmd.cmd;// Команда
         if (dataLen > 0) {
             System.arraycopy(data, 0, buffer, 3, data.length); // Данные
         }

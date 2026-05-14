@@ -67,6 +67,9 @@ public class ChannelParams
 	public String toText()
 	{
 	  String text = "";
+	  text += String.format("Флаги              : %04X\r\n", getFlags().getValue());
+	  text += String.format("Десятичная точка   : %d\r\n", decimalPoint);
+	  text += String.format("Степень            : %d\r\n", power);
 	  text += String.format("Тип канала         : < %s >\r\n", getFlags().getTypeText());					  
 	  text += String.format("Выборка массы тары : < %s >\r\n", flagToStr(getFlags().isTare()));
 	  text += String.format("Максимальный вес   : %.3f кг\r\n", getMaxWeigth());
@@ -164,7 +167,7 @@ public class ChannelParams
 		// Channel type constants
 		
 		public static final int CHANNEL_TYPE_TENSO    = 0;
-		public static final int CHANNEL_TYPE_VIBRO 	  = 1;
+		public static final int CHANNEL_TYPE_VIBRO    = 1;
 		public static final int CHANNEL_TYPE_ABSTRACT = 2;
 		public static final int CHANNEL_TYPE_RESERVED = 3;
 

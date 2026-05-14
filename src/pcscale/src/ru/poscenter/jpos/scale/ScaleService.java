@@ -961,7 +961,8 @@ public class ScaleService extends Scale implements ScaleService114 {
         }
 
         try {
-            scale.openPort(timeout);
+            scale.setParam(IDevice.PARAM_OPEN_TIMEOUT, String.valueOf(timeout));
+            scale.connect();
             deviceMetrics = scale.getDeviceMetrics();
             channelParams = scale.getChannelParams();
             
@@ -1717,7 +1718,7 @@ public class ScaleService extends Scale implements ScaleService114 {
 
     @Override
     public int getDeviceServiceVersion() throws JposException {
-        int version = 1014000 + ServiceVersionUtil.getVersionInt();
+        int version = ServiceVersionUtil.getVersionInt();
         logger.debug("getDeviceServiceVersion()");
         logger.debug("getDeviceServiceVersion: " + version);
         return version;
