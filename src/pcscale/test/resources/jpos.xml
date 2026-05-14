@@ -18,6 +18,20 @@
         <prop name="protocol" type="String" value="pos2"/>
         <prop name="password" type="String" value="30"/>
         <prop name="timeout" type="String" value="1000"/>
-    </JposEntry> 
+    </JposEntry>
+
+   <!-- То же устройство под именем по умолчанию для ScaleAcceptanceTest (-Dlogical.device.name) -->
+   <JposEntry logicalName="ScaleSimulator">
+        <creation factoryClass="ru.poscenter.jpos.EquipmentServiceInstanceFactory" serviceClass="ru.poscenter.jpos.scale.ScaleService"/>
+        <vendor name="POSCenter" url="https://poscenter.ru"/>
+        <jpos category="Scale" version="1.0"/>
+        <product description="Scale service" name="Scale" url="http://www.javapos.com"/>
+        <prop name="portType" type="String" value="0"/>
+        <prop name="portName" type="String" value="/dev/ttyACM0"/>
+        <prop name="baudRate" type="String" value="9600"/>
+        <prop name="protocol" type="String" value="pos2"/>
+        <prop name="password" type="String" value="30"/>
+        <prop name="timeout" type="String" value="1000"/>
+    </JposEntry>
     
 </JposEntries>

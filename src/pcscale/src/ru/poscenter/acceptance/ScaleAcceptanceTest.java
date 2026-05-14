@@ -1,12 +1,18 @@
-package ru.poscenter;
+package ru.poscenter.acceptance;
 
-import ru.poscenter.Pos2ProtocolEmulator;
-import gnu.io.CommPortIdentifier;
 import jpos.*;
 import jpos.events.*;
 import org.junit.*;
 import org.junit.rules.Timeout;
+import org.junit.runner.JUnitCore;
 
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,11 +28,111 @@ import static org.junit.Assert.*;
  * 2. Указать в настройках JPos Scale Service реальный COM-порт (например, COM6)
  * 3. Эмулятор подключается к парному порту (например, COM5)
  * 4. Для Linux использовать socat или аналоги
+ * <p>Запуск из IDE: Run File на этом классе (см. {@link #main(String[])}).</p>
+ * <p>В JavaPOS 1.14 {@code jpos/res/jpos.properties} по умолчанию читается через {@code ClassLoader#getResourceAsStream},
+ * а не с диска; перед тестами конфиг подхватывается с диска в {@code System} и задаётся абсолютный
+ * {@code jpos.config.populatorFile}. Каталог {@code user.dir} выставляется под XML/DTD.
+ * Предпочтителен {@code test/resources} (не {@code res}), см. {@link #installJposForAcceptanceTests()}.</p>
  * 
  * @version 1.0
  */
 public class ScaleAcceptanceTest {
 
+    /**
+     * Запуск всех тестов класса через JUnit (удобно для NetBeans: Run File).
+     * Системные свойства те же, что и у класса: {@code -Demulator.port=...}, {@code -Dlogical.device.name=...}.
+     */
+    public static void main(String[] args) throws Exception {
+        installJposForAcceptanceTests();
+        JUnitCore.main(ScaleAcceptanceTest.class.getName());
+    }
+
+    private static boolean isJposTestResourcesBundle(Path root) {
+        return Files.isRegularFile(root.resolve("jpos/res/jpos.properties"))
+                && Files.isRegularFile(root.resolve("jpos.xml"));
+    }
+
+    /**
+     * Каталог с парой {@code jpos/res/jpos.properties} + {@code jpos.xml}.
+     * Если подходит и {@code res}, и {@code test/resources}, выбирается {@code test/resources}
+     * (там приёмочный {@code jpos.xml} с {@code ScaleSimulator}).
+     */
+    private static Path findAcceptanceJposConfigDirectory() {
+        List<Path> matches = new ArrayList<>();
+        String override = System.getProperty("acceptance.jpos.root");
+        if (override != null && !override.trim().isEmpty()) {
+            Path p = Paths.get(override.trim()).toAbsolutePath().normalize();
+            if (isJposTestResourcesBundle(p)) {
+                matches.add(p);
+            }
+        }
+        Path[] candidates = new Path[] {
+                Paths.get("test/resources"),
+                Paths.get("pcscale/test/resources"),
+                Paths.get("src/pcscale/test/resources"),
+        };
+        for (Path c : candidates) {
+            Path p = c.toAbsolutePath().normalize();
+            if (isJposTestResourcesBundle(p)) {
+                matches.add(p);
+            }
+        }
+        Path here = Paths.get("").toAbsolutePath();
+        Path cur = here;
+        for (int i = 0; i < 8 && cur != null; i++) {
+            Path tr = cur.resolve("test/resources");
+            if (isJposTestResourcesBundle(tr)) {
+                matches.add(tr);
+            }
+            tr = cur.resolve("src/pcscale/test/resources");
+            if (isJposTestResourcesBundle(tr)) {
+                matches.add(tr);
+            }
+            cur = cur.getParent();
+        }
+        if (matches.isEmpty()) {
+            return null;
+        }
+        Path testResources = Paths.get("test", "resources").normalize();
+        for (Path p : matches) {
+            if (p.endsWith(testResources)) {
+                return p;
+            }
+        }
+        return matches.get(0);
+    }
+
+    /**
+     * JavaPOS 1.14: {@code DefaultProperties} ищет {@code jpos/res/jpos.properties} в classpath и пишет
+     * «file not found», если ресурса нет — дублируем содержимое файла в {@code System#setProperty}
+     * и задаём абсолютный {@code jpos.config.populatorFile}. Плюс {@code user.dir} для разбора XML/DTD.
+     */
+    private static void installJposForAcceptanceTests() throws Exception {
+        Path root = findAcceptanceJposConfigDirectory();
+        if (root == null) {
+            throw new IllegalStateException(
+                    "Не найден каталог с jpos/res/jpos.properties и jpos.xml. "
+                            + "Запустите из корня модуля pcscale или укажите -Dacceptance.jpos.root=<путь_к_test/resources>");
+        }
+        System.setProperty("user.dir", root.toAbsolutePath().normalize().toString());
+
+        Path propsPath = root.resolve("jpos/res/jpos.properties");
+        Properties jposProps = new Properties();
+        try (InputStream in = Files.newInputStream(propsPath)) {
+            jposProps.load(in);
+        }
+        for (String name : jposProps.stringPropertyNames()) {
+            if (System.getProperty(name) == null) {
+                System.setProperty(name, jposProps.getProperty(name));
+            }
+        }
+        if (System.getProperty("jpos.config.populatorFile") == null) {
+            System.setProperty(
+                    "jpos.config.populatorFile",
+                    root.resolve("jpos.xml").toAbsolutePath().normalize().toString());
+        }
+        System.out.println("[ScaleAcceptanceTest] JavaPOS bundle (filesystem): " + root.toAbsolutePath());
+    }
     
     // Читаем параметры из System.getProperty()
     // Порт эмулятора (менять под свою конфигурацию)
@@ -78,6 +184,7 @@ public class ScaleAcceptanceTest {
     
     @BeforeClass
     public static void setUpClass() throws Exception {
+        installJposForAcceptanceTests();
         // Запуск эмулятора
         emulator = new Pos2ProtocolEmulator(EMULATOR_PORT);
         emulator.start();

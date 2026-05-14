@@ -1,4 +1,4 @@
-package ru.poscenter.jpos.scale;
+package ru.poscenter.acceptance;
 
 import jpos.JposException;
 import jpos.Scale;
@@ -13,6 +13,7 @@ import jpos.events.StatusUpdateListener;
 
 import org.junit.*;
 import org.junit.rules.Timeout;
+import org.junit.runner.JUnitCore;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -27,9 +28,17 @@ import static org.junit.Assert.*;
 /**
  * ПРИЕМОЧНЫЕ ТЕСТЫ для драйвера весов через jpos.Scale
  * Совместимо с Java 8
+ * <p>Запуск из IDE: Run File на этом классе (см. {@link #main(String[])}).</p>
  */
 @RunWith(Parameterized.class)
 public class ScaleJposAcceptanceTest {
+
+    /**
+     * Запуск всех параметризованных тестов через JUnit (удобно для NetBeans: Run File).
+     */
+    public static void main(String[] args) {
+        JUnitCore.main(ScaleJposAcceptanceTest.class.getName());
+    }
     
     private static final String CONFIG_FILE = "scale-test.properties";
     private static final String DEFAULT_JPOS_XML = "jpos.xml";

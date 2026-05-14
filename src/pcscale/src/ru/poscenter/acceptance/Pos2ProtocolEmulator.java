@@ -1,11 +1,8 @@
-package ru.poscenter;
+package ru.poscenter.acceptance;
 
-import gnu.io.CommPortIdentifier;
-import gnu.io.PortInUseException;
-import gnu.io.SerialPort;
-import gnu.io.SerialPortEvent;
-import gnu.io.SerialPortEventListener;
-import gnu.io.UnsupportedCommOperationException;
+import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortDataListener;
+import com.fazecast.jSerialComm.SerialPortEvent;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,7 +10,6 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TooManyListenersException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -21,9 +17,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Эмулятор весов с полной поддержкой протокола POS2 V1.3
- * Работает через gnu.io.SerialPort (RXTX)
+ * Работает через jSerialComm ({@link SerialPort})
  */
-public class Pos2ProtocolEmulator implements SerialPortEventListener {
+public class Pos2ProtocolEmulator {
     
     // Константы протокола
     public static final byte STX = 0x02;
@@ -111,8 +107,8 @@ public class Pos2ProtocolEmulator implements SerialPortEventListener {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean connected = new AtomicBoolean(false);
     
-    private CommPortIdentifier portIdentifier;
     private SerialPort serialPort;
+    private SerialPortDataListener portDataListener;
     private InputStream inputStream;
     private OutputStream outputStream;
     
@@ -213,34 +209,32 @@ public class Pos2ProtocolEmulator implements SerialPortEventListener {
         if (running.get()) return;
         
         try {
-            // Получаем идентификатор порта
-            portIdentifier = CommPortIdentifier.getPortIdentifier(portName);
-            
-            if (portIdentifier.isCurrentlyOwned()) {
-                throw new Exception("Port " + portName + " is currently in use");
+            serialPort = SerialPort.getCommPort(portName);
+            if (!serialPort.openPort(2000)) {
+                throw new Exception("Port " + portName + " is not available or already in use");
             }
             
-            // Открываем порт
-            serialPort = (SerialPort) portIdentifier.open("ScaleEmulator", 2000);
+            serialPort.setComPortParameters(9600, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
+            serialPort.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
+            serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 100, 0);
             
-            // Настраиваем параметры
-            serialPort.setSerialPortParams(
-                9600,                       // скорость
-                SerialPort.DATABITS_8,       // 8 бит данных
-                SerialPort.STOPBITS_1,       // 1 стоп-бит
-                SerialPort.PARITY_NONE       // без четности
-            );
-            
-            serialPort.setFlowControlMode(SerialPort.FLOWCONTROL_NONE);
-            serialPort.enableReceiveTimeout(100); // таймаут чтения 100 мс
-            
-            // Получаем потоки
             inputStream = serialPort.getInputStream();
             outputStream = serialPort.getOutputStream();
             
-            // Добавляем слушателя событий
-            serialPort.addEventListener(this);
-            serialPort.notifyOnDataAvailable(true);
+            portDataListener = new SerialPortDataListener() {
+                @Override
+                public int getListeningEvents() {
+                    return SerialPort.LISTENING_EVENT_DATA_AVAILABLE;
+                }
+                
+                @Override
+                public void serialEvent(SerialPortEvent event) {
+                    if (event.getEventType() == SerialPort.LISTENING_EVENT_DATA_AVAILABLE) {
+                        handleDataAvailable();
+                    }
+                }
+            };
+            serialPort.addDataListener(portDataListener);
             
             connected.set(true);
             running.set(true);
@@ -257,9 +251,10 @@ public class Pos2ProtocolEmulator implements SerialPortEventListener {
         connected.set(false);
         
         if (serialPort != null) {
-            serialPort.removeEventListener();
-            serialPort.close();
+            serialPort.removeDataListener();
+            serialPort.closePort();
         }
+        portDataListener = null;
         
         try {
             if (inputStream != null) inputStream.close();
@@ -271,27 +266,7 @@ public class Pos2ProtocolEmulator implements SerialPortEventListener {
         System.out.println("Pos2ProtocolEmulator stopped");
     }
     
-    // ========== Обработка событий порта ==========
-    
-    @Override
-    public void serialEvent(SerialPortEvent event) {
-        switch (event.getEventType()) {
-            case SerialPortEvent.DATA_AVAILABLE:
-                handleDataAvailable();
-                break;
-            case SerialPortEvent.BI:
-            case SerialPortEvent.OE:
-            case SerialPortEvent.FE:
-            case SerialPortEvent.PE:
-            case SerialPortEvent.CD:
-            case SerialPortEvent.CTS:
-            case SerialPortEvent.DSR:
-            case SerialPortEvent.RI:
-            case SerialPortEvent.OUTPUT_BUFFER_EMPTY:
-                // Игнорируем другие события
-                break;
-        }
-    }
+    // ========== Обработка событий порта (jSerialComm SerialPortDataListener) ==========
     
     private void handleDataAvailable() {
         try {
