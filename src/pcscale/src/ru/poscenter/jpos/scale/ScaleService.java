@@ -687,6 +687,7 @@ public class ScaleService extends Scale implements ScaleService114 {
 
         try {
             this.tareWeight = tareWeight;
+            scale.tara(0);
             scale.tara((long) tareWeight);
             logger.debug("setTareWeight: OK");
         } catch (Exception e) {

@@ -6,6 +6,14 @@
       
 ********************************************************************************
 
+  May, 19 2026 16:30
+  deviceServiceVersion = 1014008
+
+  [-] Fixed error with setTareWeight method. 
+      Tare must be reset before it can be set.
+  
+********************************************************************************
+
   May, 14 2026 16:30
   deviceServiceVersion = 1014007
 
