@@ -133,7 +133,7 @@ public class ShtrihMProtocolSerial {
             lrc = data[len];
             
             command = new ScaleCommand((byte) cmd, 1000);
-            System.arraycopy(data, 1, data, 0, len);
+            System.arraycopy(data, 1, data, 0, len-1);
             
             command.setData(data);
             command.crc = (byte) lrc;

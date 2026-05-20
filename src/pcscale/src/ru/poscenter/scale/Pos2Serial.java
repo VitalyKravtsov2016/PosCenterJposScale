@@ -250,6 +250,7 @@ public class Pos2Serial extends ScaleSerial {
     }
 
     public void tara(long v) throws Exception {
+        v = channelParams.valueToScale((int)v);
         ScaleCommand command = createCommand(CMD_SET_TARA);
         command.write(getPassword(), charsetName);
         command.write(v, 2);
@@ -291,8 +292,8 @@ public class Pos2Serial extends ScaleSerial {
         command.write(getPassword(), charsetName);
         execute(command);
         int status = reply.readShort();
-        int weight = channelParams.convertWeight(reply.readInt());
-        int tare = channelParams.convertWeight(reply.readShort());
+        int weight = channelParams.scaleToValue(reply.readInt());
+        int tare = channelParams.scaleToValue(reply.readShort());
         this.weight = new ScaleWeight(weight, tare, new ScaleStatus(status));
         logger.debug("weight = " + weight + ", tare = " + tare + ", flags = " + status);
     }

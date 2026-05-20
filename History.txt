@@ -6,6 +6,14 @@
       
 ********************************************************************************
 
+  May, 20 2026 13:00
+  deviceServiceVersion = 1014009
+
+  [-] Fixed error with setTareWeight method. 
+      Tare value must be converted with scale "power" of ChannelParams.
+	  
+********************************************************************************
+
   May, 19 2026 16:30
   deviceServiceVersion = 1014008
 

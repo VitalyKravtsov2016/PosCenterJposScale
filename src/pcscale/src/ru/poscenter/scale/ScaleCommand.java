@@ -139,6 +139,11 @@ public class ScaleCommand {
         return new String(data, charsetName);
     }
 
+    public String readString(String charsetName, int count) throws Exception {
+        byte[] data = trimRight(readBytes(count));
+        return new String(data, charsetName);
+    }
+    
     public byte[] trimRight(byte[] data) {
         byte[] result = new byte[0];
 

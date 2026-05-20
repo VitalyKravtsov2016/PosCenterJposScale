@@ -15,9 +15,14 @@ public class ChannelParams
 	public int pointCount;
 	public int calibCount;
 
-        public int convertWeight(int weight){
+        public int scaleToValue(int value){
             double multiplier = Math.pow(10, power + 3);
-            return (int)Math.round(weight * multiplier);
+            return (int)Math.round(value * multiplier);
+        }
+        
+        public int valueToScale(int value){
+            double multiplier = Math.pow(10, power + 3);
+            return (int)Math.round(value / multiplier);
         }
         
 	public double getRange(int index){

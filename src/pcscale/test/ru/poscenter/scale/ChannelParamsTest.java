@@ -41,13 +41,13 @@ public class ChannelParamsTest {
      * Test of convertWeight method, of class ChannelParams.
      */
     @Test
-    public void testConvertWeight() {
+    public void testScaleToValue() {
         System.out.println("convertWeight");
         int weight = 1230;
         int expResult = 123;
         ChannelParams instance = new ChannelParams();
         instance.setPower(-4);
-        int result = instance.convertWeight(weight);
+        int result = instance.scaleToValue(weight);
         assertEquals(expResult, result);
     }
 
@@ -55,13 +55,13 @@ public class ChannelParamsTest {
      * Test of convertWeight method, of class ChannelParams.
      */
     @Test
-    public void testConvertWeight2() {
+    public void testScaleToValue2() {
         System.out.println("convertWeight2");
         int weight = 123;
         int expResult = 123;
         ChannelParams instance = new ChannelParams();
         instance.setPower(-3);
-        int result = instance.convertWeight(weight);
+        int result = instance.scaleToValue(weight);
         assertEquals(expResult, result);
     }
     
@@ -69,13 +69,27 @@ public class ChannelParamsTest {
      * Test of convertWeight method, of class ChannelParams.
      */
     @Test
-    public void testConvertWeight3() {
+    public void testScaleToValue3() {
         System.out.println("convertWeight2");
         int weight = 123;
         int expResult = 1230;
         ChannelParams instance = new ChannelParams();
         instance.setPower(-2);
-        int result = instance.convertWeight(weight);
+        int result = instance.scaleToValue(weight);
+        assertEquals(expResult, result);
+    }
+    
+    /**
+     * Test of valueToScale method, of class ChannelParams.
+     */
+    @Test
+    public void testValueToScale() {
+        System.out.println("ValueToScale");
+        int value = 123;
+        int expResult = 1230;
+        ChannelParams instance = new ChannelParams();
+        instance.setPower(-4);
+        int result = instance.valueToScale(value);
         assertEquals(expResult, result);
     }
 }
