@@ -9,6 +9,8 @@ import jpos.JposConst;
 import jpos.JposException;
 import jpos.Scale;
 
+import ru.poscenter.jpos.JposUtils;
+
 /**
  * Закладка 1: Общие методы UPOS.
  *
@@ -372,8 +374,7 @@ public class Tab1UposPage extends JPanel {
     }
 
     private void showError(String method, JposException ex) {
-        String msg = method + "() ОШИБКА: ErrorCode=" + ex.getErrorCode()
-                + " (" + ex.getMessage() + ")";
+        String msg = method + "() ОШИБКА:\n" + JposUtils.formatJposException(ex);
         taResult.setForeground(Color.RED);
         taResult.setText(msg);
         eventsPage.log(msg);

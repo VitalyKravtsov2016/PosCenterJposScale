@@ -11,6 +11,8 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortIOException;
+import com.fazecast.jSerialComm.SerialPortTimeoutException;
 import com.fazecast.jSerialComm.SerialPortInvalidPortException;
 
 import ru.poscenter.IDevice;
@@ -64,7 +66,7 @@ public class JSerialPort implements SerialPortInterface {
 
         long expTime = System.currentTimeMillis() + openTimeout;
         for (;;) {
-            if (openPort())  {
+            if (openPort()) {
                 break;
             }
             if (System.currentTimeMillis() > expTime) {
@@ -82,7 +84,7 @@ public class JSerialPort implements SerialPortInterface {
                 logger.error("SerialPort.getCommPort returned null");
                 return false;
             }
-            if (!port.openPort(0, 1024, 1024)){
+            if (!port.openPort(0, 1024, 1024)) {
                 port = null;
                 return false;
             }
@@ -181,10 +183,23 @@ public class JSerialPort implements SerialPortInterface {
         Logger2.logTx(logger, in.data);
 
         open();
-        OutputStream out = port.getOutputStream();
-        out.write(in.data);
-        if (flush) {
-            out.flush();
+        try {
+            OutputStream out = port.getOutputStream();
+            out.write(in.data);
+            if (flush) {
+                out.flush();
+            }
+        } catch (SerialPortTimeoutException e) {
+            close();
+            throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
+        }
+        catch(SerialPortIOException e){
+            close();
+            throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
+        }
+        catch(SerialPortInvalidPortException e){
+            close();
+            throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
         }
     }
 

@@ -6,6 +6,13 @@
       
 ********************************************************************************
 
+  May, 26 2026 16:30
+  deviceServiceVersion = 1014010
+
+  [-] Fixed error with cable or virtual serial port disconnection
+  
+********************************************************************************
+
   May, 20 2026 13:00
   deviceServiceVersion = 1014009
 

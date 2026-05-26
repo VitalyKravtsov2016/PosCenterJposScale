@@ -50,7 +50,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     private final Logger logger = LogManager.getLogger(ScaleService.class);
 
     // Константы
-    private static final int POLL_INTERVAL_MS = 100;
+    private static final int POLL_INTERVAL_MS = 500;
     private static final int THREAD_STOP_TIMEOUT_MS = 1000;
     private static final int MAX_RETRY_COUNT = 3;
 
@@ -68,7 +68,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     private int tareWeight = 0;
     private long unitPrice = 0;
     private long salesPrice = 0;
-    
+
     // Новые свойства для Scale 1.14
     private int minimumWeight = 0;
     private int priceCalculationMode = SCAL_PCM_OPERATOR;
@@ -93,10 +93,10 @@ public class ScaleService extends Scale implements ScaleService114 {
     private Thread eventThread = null;
     private Thread pollThread = null;
     private Thread weightThread = null;
-    
+
     // ЕДИНАЯ ОЧЕРЕДЬ СОБЫТИЙ
     private final BlockingQueue<JposEvent> eventQueue = new LinkedBlockingQueue<>();
-    
+
     // Очередь асинхронных запросов
     private final BlockingQueue<WeightRequest> requestQueue = new LinkedBlockingQueue<>();
 
@@ -106,7 +106,7 @@ public class ScaleService extends Scale implements ScaleService114 {
 
     // Флаги
     private boolean pollEnabled = true;
-    
+
     // Capabilities for Scale 1.14 (по умолчанию false, если железо не поддерживает)
     private boolean capFreezeValue = false;
     private boolean capReadLiveWeightWithTare = false;
@@ -118,28 +118,19 @@ public class ScaleService extends Scale implements ScaleService114 {
     // ======================== СТАТИСТИКА UPOS ========================
     /**
      * Хранилище статистики устройства согласно UPOS 1.15
-     * 
-     * Device Information (J.2.1):
-     * - UnifiedPOSVersion
-     * - DeviceCategory
-     * - ManufacturerName
-     * - ModelName
-     * - SerialNumber
-     * - ManufactureDate
-     * - MechanicalRevision
-     * - FirmwareRevision
-     * - Interface
-     * - InstallationDate
-     * 
-     * Common Statistics (J.2.1):
-     * - HoursPoweredCount
-     * - CommunicationErrorCount
-     * 
-     * Scale Statistics (J.2.18):
-     * - GoodWeightReadCount
+     *
+     * Device Information (J.2.1): - UnifiedPOSVersion - DeviceCategory -
+     * ManufacturerName - ModelName - SerialNumber - ManufactureDate -
+     * MechanicalRevision - FirmwareRevision - Interface - InstallationDate
+     *
+     * Common Statistics (J.2.1): - HoursPoweredCount - CommunicationErrorCount
+     *
+     * Scale Statistics (J.2.18): - GoodWeightReadCount
      */
     private static class Statistics {
+
         // Device Information (неизменяемые)
+
         private final String unifiedPOSVersion = "1.15";
         private final String deviceCategory = "Scale";
         private String manufacturerName = "SHTRIKH-M";
@@ -150,19 +141,21 @@ public class ScaleService extends Scale implements ScaleService114 {
         private String firmwareRevision = "";
         private String interfaceType = "Serial";
         private String installationDate = "";
-        
+
         // Common Statistics (J.2.1)
         private long hoursPoweredCount = 0;      // Часы под напряжением
         private long communicationErrorCount = 0; // Количество ошибок связи
-        
+
         // Scale Statistics (J.2.18)
         private long goodWeightReadCount = 0;    // Количество успешных взвешиваний
-        
+
         // Вспомогательные поля
         private long lastPowerOnTime = System.currentTimeMillis();
         private boolean powered = true;
-        
-        /** Обновление счетчика часов под напряжением */
+
+        /**
+         * Обновление счетчика часов под напряжением
+         */
         public void updateHoursPowered() {
             if (powered) {
                 long now = System.currentTimeMillis();
@@ -173,8 +166,10 @@ public class ScaleService extends Scale implements ScaleService114 {
                 }
             }
         }
-        
-        /** Установить состояние питания */
+
+        /**
+         * Установить состояние питания
+         */
         public void setPowered(boolean powered) {
             if (this.powered != powered) {
                 updateHoursPowered(); // Фиксируем часы перед сменой состояния
@@ -184,34 +179,40 @@ public class ScaleService extends Scale implements ScaleService114 {
                 }
             }
         }
-        
-        /** Сбросить все счетчики */
+
+        /**
+         * Сбросить все счетчики
+         */
         public void reset() {
             hoursPoweredCount = 0;
             communicationErrorCount = 0;
             goodWeightReadCount = 0;
             lastPowerOnTime = System.currentTimeMillis();
         }
-        
-        /** Получить XML-строку статистики в формате UPOS */
+
+        /**
+         * Получить XML-строку статистики в формате UPOS
+         */
         public String toXML() {
             updateHoursPowered(); // Актуализируем часы перед формированием XML
-            
+
             StringBuilder sb = new StringBuilder();
             sb.append("<UnifiedPOSStatisticsContext>\n");
-            
+
             // Common Statistics
             sb.append("    <HoursPoweredCount>").append(hoursPoweredCount).append("</HoursPoweredCount>\n");
             sb.append("    <CommunicationErrorCount>").append(communicationErrorCount).append("</CommunicationErrorCount>\n");
-            
+
             // Scale Statistics
             sb.append("    <GoodWeightReadCount>").append(goodWeightReadCount).append("</GoodWeightReadCount>\n");
-            
+
             sb.append("</UnifiedPOSStatisticsContext>");
             return sb.toString();
         }
-        
-        /** Получить XML с Device Information */
+
+        /**
+         * Получить XML с Device Information
+         */
         public String getDeviceInformationXML() {
             StringBuilder sb = new StringBuilder();
             sb.append("<DeviceInformation>\n");
@@ -228,26 +229,28 @@ public class ScaleService extends Scale implements ScaleService114 {
             sb.append("</DeviceInformation>");
             return sb.toString();
         }
-        
+
         private String escapeXML(String str) {
-            if (str == null) return "";
+            if (str == null) {
+                return "";
+            }
             return str.replace("&", "&amp;")
-                      .replace("<", "&lt;")
-                      .replace(">", "&gt;")
-                      .replace("\"", "&quot;")
-                      .replace("'", "&apos;");
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+                    .replace("'", "&apos;");
         }
-        
+
         // Getters for updates
         public void incrementCommunicationErrorCount() {
             communicationErrorCount++;
         }
-        
+
         public void incrementGoodWeightReadCount() {
             goodWeightReadCount++;
         }
     }
-    
+
     private Statistics statistics = new Statistics();
 
     // ======================== ВНУТРЕННИЕ КЛАССЫ ========================
@@ -362,24 +365,23 @@ public class ScaleService extends Scale implements ScaleService114 {
     }
 
     /**
-     * Проверяет, что текущий поток не является потоком доставки событий.
-     * Эта проверка нужна ТОЛЬКО для close(), так как close() останавливает
-     * поток событий и ждет его завершения, что может привести к deadlock.
+     * Проверяет, что текущий поток не является потоком доставки событий. Эта
+     * проверка нужна ТОЛЬКО для close(), так как close() останавливает поток
+     * событий и ждет его завершения, что может привести к deadlock.
      *
-     * @throws JposException с кодом JPOS_E_ILLEGAL, если вызов из потока событий
+     * @throws JposException с кодом JPOS_E_ILLEGAL, если вызов из потока
+     * событий
      */
     private void checkNotInEventThread() throws JposException {
         if (Thread.currentThread() == eventThread) {
             logger.error("close() called from event handler thread - this would cause deadlock");
-            throw new JposException(JPOS_E_ILLEGAL, 
-                "close() cannot be called from event handler thread");
+            throw new JposException(JPOS_E_ILLEGAL,
+                    "close() cannot be called from event handler thread");
         }
     }
 
     // ======================== CAPABILITY СВОЙСТВА ========================
-    
     // === Capabilities for Scale 1.14 ===
-    
     @Override
     public boolean getCapFreezeValue() throws JposException {
         logger.debug("getCapFreezeValue");
@@ -427,9 +429,8 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("getCapTarePriority: " + capTarePriority);
         return capTarePriority;
     }
-    
-    // === Стандартные capabilities ===
 
+    // === Стандартные capabilities ===
     @Override
     public boolean getCapCompareFirmwareVersion() throws JposException {
         logger.debug("getCapCompareFirmwareVersion");
@@ -530,7 +531,6 @@ public class ScaleService extends Scale implements ScaleService114 {
     }
 
     // ======================== СВОЙСТВА ========================
-    
     @Override
     public int getMinimumWeight() throws JposException {
         logger.debug("getMinimumWeight");
@@ -613,7 +613,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     public int getDataCount() throws JposException {
         logger.debug("getDataCount");
         checkOpened();
-        
+
         // ПРОСМАТРИВАЕМ ВСЮ ОЧЕРЕДЬ, СЧИТАЕМ ТОЛЬКО DataEvent
         int count = 0;
         for (JposEvent event : eventQueue) {
@@ -621,7 +621,7 @@ public class ScaleService extends Scale implements ScaleService114 {
                 count++;
             }
         }
-        
+
         logger.debug("getDataCount: " + count);
         return count;
     }
@@ -691,9 +691,8 @@ public class ScaleService extends Scale implements ScaleService114 {
             scale.tara((long) tareWeight);
             logger.debug("setTareWeight: OK");
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("setTareWeight error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -821,7 +820,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         this.asyncMode = false;
         this.deviceEnabled = false;
         this.claimed = false;
-        
+
         // Инициализация capabilities для 1.14 (по умолчанию false)
         initCapabilities114();
 
@@ -859,26 +858,26 @@ public class ScaleService extends Scale implements ScaleService114 {
 
                 value = reader.readString("portType", "0");
                 params.set(IDevice.PARAM_PORTTYPE, value);
-                
+
                 // Чтение настроек для 1.14 capabilities
                 String capValue = reader.readString("capFreezeValue", "false");
                 capFreezeValue = Boolean.parseBoolean(capValue);
-                
+
                 capValue = reader.readString("capReadLiveWeightWithTare", "false");
                 capReadLiveWeightWithTare = Boolean.parseBoolean(capValue);
-                
+
                 capValue = reader.readString("capSetPriceCalculationMode", "false");
                 capSetPriceCalculationMode = Boolean.parseBoolean(capValue);
-                
+
                 capValue = reader.readString("capSetUnitPriceWithWeightUnit", "false");
                 capSetUnitPriceWithWeightUnit = Boolean.parseBoolean(capValue);
-                
+
                 capValue = reader.readString("capSpecialTare", "false");
                 capSpecialTare = Boolean.parseBoolean(capValue);
-                
+
                 capValue = reader.readString("capTarePriority", "false");
                 capTarePriority = Boolean.parseBoolean(capValue);
-                
+
                 // Чтение минимального веса
                 String minWeightStr = reader.readString("minimumWeight", "0");
                 try {
@@ -890,20 +889,19 @@ public class ScaleService extends Scale implements ScaleService114 {
 
             scale = createProtocol(protocol);
             scale.setParams(params);
-            
+
             // ЗАПУСКАЕМ ПОТОК СОБЫТИЙ СРАЗУ ПОСЛЕ OPEN
             startEventThread();
-            
+
             setState(JPOS_S_IDLE);
             logger.debug("open: OK");
 
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("open error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     /**
      * Инициализация capabilities для версии 1.14
      */
@@ -923,7 +921,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("close()");
         // ТОЛЬКО ЗДЕСЬ нужна проверка на поток событий
         checkNotInEventThread();
-        
+
         try {
             if (getDeviceEnabled()) {
                 setDeviceEnabled(false);
@@ -945,9 +943,8 @@ public class ScaleService extends Scale implements ScaleService114 {
 
             logger.debug("close: OK");
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("close error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -966,10 +963,10 @@ public class ScaleService extends Scale implements ScaleService114 {
             scale.connect();
             deviceMetrics = scale.getDeviceMetrics();
             channelParams = scale.getChannelParams();
-            
+
             // ========== ИНИЦИАЛИЗАЦИЯ СТАТИСТИКИ ==========
             statistics = new Statistics();
-            
+
             // Заполняем Device Information из метрик устройства (если доступны)
             if (deviceMetrics != null) {
                 if (deviceMetrics.getDescription() != null && !deviceMetrics.getDescription().isEmpty()) {
@@ -980,7 +977,7 @@ public class ScaleService extends Scale implements ScaleService114 {
                     statistics.modelName += " (Model: " + deviceMetrics.getModel() + ")";
                 }
             }
-            
+
             // Если есть конфигурационные параметры для Device Information
             if (m_jposEntry != null) {
                 JposPropertyReader reader = new JposPropertyReader(m_jposEntry);
@@ -990,35 +987,35 @@ public class ScaleService extends Scale implements ScaleService114 {
                 }
                 String interfaceType = reader.readString("interfaceType", "Serial");
                 statistics.interfaceType = interfaceType;
-                
+
                 // Дата установки (можно задать в конфиге)
                 statistics.installationDate = reader.readString("installationDate", "");
             }
-            
+
             // ========== УСТАНОВКА MIN/MAX ВЕСА ИЗ CHANNELPARAMS ==========
             if (channelParams != null) {
                 // Минимальный вес в граммах
                 double minWeightKg = channelParams.getMinWeigth();
                 minimumWeight = (int) (minWeightKg * 1000); // перевод в граммы
-                
+
                 // Максимальный вес в граммах
                 double maxWeightKg = channelParams.getMaxWeigth();
                 maximumWeight = (int) (maxWeightKg * 1000); // перевод в граммы
-                
+
                 // Определение единицы измерения (по умолчанию граммы, но можно уточнить)
                 weightUnit = SCAL_WU_GRAM;
-                
+
                 logger.info("ChannelParams: minWeight=" + minimumWeight + "g, maxWeight=" + maximumWeight + "g");
                 logger.info("ChannelParams details:\n" + channelParams.toText());
             } else {
                 logger.warn("channelParams is null, using default weight limits");
             }
-            
+
             // Устанавливаем статистику питания
             if (statistics != null) {
                 statistics.setPowered(true);
             }
-            
+
             claimed = true;
             if (deviceMetrics != null) {
                 logger.debug(deviceMetrics.toString());
@@ -1026,9 +1023,8 @@ public class ScaleService extends Scale implements ScaleService114 {
             logger.debug("claim: OK, statistics initialized");
 
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("claim error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1064,9 +1060,8 @@ public class ScaleService extends Scale implements ScaleService114 {
             setState(JPOS_S_IDLE);
             logger.debug("release: OK");
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("release error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1084,7 +1079,7 @@ public class ScaleService extends Scale implements ScaleService114 {
 
                 deviceEnabled = true;
                 setState(JPOS_S_IDLE);
-                
+
                 // Устанавливаем состояние питания
                 if (statistics != null) {
                     statistics.setPowered(true);
@@ -1097,7 +1092,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             } else {
                 deviceEnabled = false;
                 setState(JPOS_S_IDLE);
-                
+
                 // Фиксируем, что питание выключено
                 if (statistics != null) {
                     statistics.setPowered(false);
@@ -1110,14 +1105,13 @@ public class ScaleService extends Scale implements ScaleService114 {
 
                 stopPollThread();
                 requestQueue.clear();
-                
+
                 logger.debug("setDeviceEnabled: device disabled");
             }
             logger.debug("setDeviceEnabled: OK");
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("setDeviceEnabled error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1161,8 +1155,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         try {
             if (asyncMode) {
                 // Атомарная проверка и установка состояния
-                synchronized (this) 
-                {
+                synchronized (this) {
                     if (state == JPOS_S_BUSY) {
                         throw new JposException(JPOS_E_BUSY, "Asynchronous operation already in progress");
                     }
@@ -1182,9 +1175,8 @@ public class ScaleService extends Scale implements ScaleService114 {
             logger.error("readWeight error: " + e.getMessage());
             throw e;
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("readWeight error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1203,30 +1195,28 @@ public class ScaleService extends Scale implements ScaleService114 {
             scale.zero();
             logger.debug("zeroScale: OK");
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("zeroScale error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     // ======================== НОВЫЕ МЕТОДЫ SCALE 1.14 ========================
-    
     /**
-     * Выполняет взвешивание с расчетом цены.
-     * Позволяет учитывать множественные факторы ценообразования.
+     * Выполняет взвешивание с расчетом цены. Позволяет учитывать множественные
+     * факторы ценообразования.
      */
     @Override
     public void doPriceCalculating(int[] weightValue, int[] tare, long[] unitPrice,
             long[] unitPriceX, int[] weightUnitX, int[] weightNumeratorX,
             int[] weightDenominatorX, long[] price, int timeout) throws JposException {
-        
+
         logger.debug("doPriceCalculating(timeout=" + timeout + ")");
         checkEnabled();
-        
+
         if (!capSetPriceCalculationMode) {
             throw new JposException(JPOS_E_ILLEGAL, "Price calculation mode not supported");
         }
-        
+
         try {
             if (asyncMode) {
                 synchronized (this) {
@@ -1238,14 +1228,30 @@ public class ScaleService extends Scale implements ScaleService114 {
                 // Для асинхронного режима - используем существующий механизм запросов
                 requestQueue.offer(new WeightRequest(timeout));
                 // В асинхронном режиме возвращаем нули
-                if (weightValue != null && weightValue.length > 0) weightValue[0] = 0;
-                if (tare != null && tare.length > 0) tare[0] = 0;
-                if (unitPrice != null && unitPrice.length > 0) unitPrice[0] = 0;
-                if (unitPriceX != null && unitPriceX.length > 0) unitPriceX[0] = 0;
-                if (weightUnitX != null && weightUnitX.length > 0) weightUnitX[0] = 0;
-                if (weightNumeratorX != null && weightNumeratorX.length > 0) weightNumeratorX[0] = 0;
-                if (weightDenominatorX != null && weightDenominatorX.length > 0) weightDenominatorX[0] = 0;
-                if (price != null && price.length > 0) price[0] = 0;
+                if (weightValue != null && weightValue.length > 0) {
+                    weightValue[0] = 0;
+                }
+                if (tare != null && tare.length > 0) {
+                    tare[0] = 0;
+                }
+                if (unitPrice != null && unitPrice.length > 0) {
+                    unitPrice[0] = 0;
+                }
+                if (unitPriceX != null && unitPriceX.length > 0) {
+                    unitPriceX[0] = 0;
+                }
+                if (weightUnitX != null && weightUnitX.length > 0) {
+                    weightUnitX[0] = 0;
+                }
+                if (weightNumeratorX != null && weightNumeratorX.length > 0) {
+                    weightNumeratorX[0] = 0;
+                }
+                if (weightDenominatorX != null && weightDenominatorX.length > 0) {
+                    weightDenominatorX[0] = 0;
+                }
+                if (price != null && price.length > 0) {
+                    price[0] = 0;
+                }
                 logger.debug("doPriceCalculating: async request queued");
             } else {
                 // Синхронный режим
@@ -1286,25 +1292,24 @@ public class ScaleService extends Scale implements ScaleService114 {
             logger.error("doPriceCalculating error: " + e.getMessage());
             throw e;
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("doPriceCalculating error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     /**
-     * Замораживает значения тары и/или цены за единицу.
-     * Позволяет сохранять значения после снятия товара с весов.
+     * Замораживает значения тары и/или цены за единицу. Позволяет сохранять
+     * значения после снятия товара с весов.
      */
     @Override
     public void freezeValue(int item, boolean freeze) throws JposException {
         logger.debug("freezeValue(item=" + item + ", freeze=" + freeze + ")");
         checkEnabled();
-        
+
         if (!capFreezeValue) {
             throw new JposException(JPOS_E_ILLEGAL, "Freeze value not supported");
         }
-        
+
         try {
             if (freeze) {
                 frozenItems |= item;
@@ -1321,12 +1326,11 @@ public class ScaleService extends Scale implements ScaleService114 {
             }
             logger.debug("freezeValue: OK, frozenItems=" + frozenItems);
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("freezeValue error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     /**
      * Читает "живой" вес с учетом тары для отображения на дисплее.
      */
@@ -1334,11 +1338,11 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void readLiveWeightWithTare(int[] weightData, int[] tare, int timeout) throws JposException {
         logger.debug("readLiveWeightWithTare(timeout=" + timeout + ")");
         checkEnabled();
-        
+
         if (!capReadLiveWeightWithTare) {
             throw new JposException(JPOS_E_ILLEGAL, "Read live weight with tare not supported");
         }
-        
+
         try {
             if (asyncMode) {
                 synchronized (this) {
@@ -1348,8 +1352,12 @@ public class ScaleService extends Scale implements ScaleService114 {
                     setState(JPOS_S_BUSY);
                 }
                 requestQueue.offer(new WeightRequest(timeout));
-                if (weightData != null && weightData.length > 0) weightData[0] = 0;
-                if (tare != null && tare.length > 0) tare[0] = 0;
+                if (weightData != null && weightData.length > 0) {
+                    weightData[0] = 0;
+                }
+                if (tare != null && tare.length > 0) {
+                    tare[0] = 0;
+                }
                 logger.debug("readLiveWeightWithTare: async request queued");
             } else {
                 long weight = readWeightSync(timeout);
@@ -1365,43 +1373,42 @@ public class ScaleService extends Scale implements ScaleService114 {
             logger.error("readLiveWeightWithTare error: " + e.getMessage());
             throw e;
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("readLiveWeightWithTare error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     /**
-     * Устанавливает режим расчета цены (самообслуживание, оператор, печать этикеток).
+     * Устанавливает режим расчета цены (самообслуживание, оператор, печать
+     * этикеток).
      */
     @Override
     public void setPriceCalculationMode(int mode) throws JposException {
         logger.debug("setPriceCalculationMode(mode=" + mode + ")");
         checkEnabled();
-        
+
         if (!capSetPriceCalculationMode) {
             throw new JposException(JPOS_E_ILLEGAL, "Set price calculation mode not supported");
         }
-        
+
         // Проверка допустимых значений
-        if (mode != SCAL_PCM_PRICE_LABELING && 
-            mode != SCAL_PCM_SELF_SERVICE && 
-            mode != SCAL_PCM_OPERATOR) {
+        if (mode != SCAL_PCM_PRICE_LABELING
+                && mode != SCAL_PCM_SELF_SERVICE
+                && mode != SCAL_PCM_OPERATOR) {
             throw new JposException(JPOS_E_ILLEGAL, "Invalid price calculation mode: " + mode);
         }
-        
+
         try {
             this.priceCalculationMode = mode;
             // Здесь должна быть отправка команды на устройство
             // scale.setPriceCalculationMode(mode);
             logger.debug("setPriceCalculationMode: OK, mode=" + mode);
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("setPriceCalculationMode error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     /**
      * Устанавливает специальное значение тары (ручная, процентная, взвешенная).
      */
@@ -1409,21 +1416,21 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void setSpecialTare(int mode, int data) throws JposException {
         logger.debug("setSpecialTare(mode=" + mode + ", data=" + data + ")");
         checkEnabled();
-        
+
         if (!capSpecialTare) {
             throw new JposException(JPOS_E_ILLEGAL, "Special tare not supported");
         }
-        
+
         // Проверка допустимых значений mode
-        if (mode != SCAL_SST_DEFAULT && mode != SCAL_SST_MANUAL && 
-            mode != SCAL_SST_PERCENT && mode != SCAL_SST_WEIGHTED) {
+        if (mode != SCAL_SST_DEFAULT && mode != SCAL_SST_MANUAL
+                && mode != SCAL_SST_PERCENT && mode != SCAL_SST_WEIGHTED) {
             throw new JposException(JPOS_E_ILLEGAL, "Invalid special tare mode: " + mode);
         }
-        
+
         try {
             this.specialTareMode = mode;
             this.specialTareData = data;
-            
+
             // В зависимости от режима, устанавливаем соответствующий вес тары
             switch (mode) {
                 case SCAL_SST_DEFAULT:
@@ -1448,15 +1455,14 @@ public class ScaleService extends Scale implements ScaleService114 {
                     }
                     break;
             }
-            
+
             logger.debug("setSpecialTare: OK, mode=" + mode + ", tareWeight=" + tareWeight);
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("setSpecialTare error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     /**
      * Устанавливает приоритет использования тары.
      */
@@ -1464,59 +1470,58 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void setTarePrioity(int priority) throws JposException {
         logger.debug("setTarePrioity(priority=" + priority + ")");
         checkEnabled();
-        
+
         if (!capTarePriority) {
             throw new JposException(JPOS_E_ILLEGAL, "Tare priority not supported");
         }
-        
+
         // Проверка допустимых значений
         if (priority != SCAL_STP_FIRST && priority != SCAL_STP_NONE) {
             throw new JposException(JPOS_E_ILLEGAL, "Invalid tare priority: " + priority);
         }
-        
+
         try {
             this.tarePriority = priority;
             // Здесь должна быть отправка команды на устройство
             // scale.setTarePriority(priority);
             logger.debug("setTarePrioity: OK, priority=" + priority);
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("setTarePrioity error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
-    
+
     /**
-     * Устанавливает цену за единицу с учетом единицы измерения веса.
-     * Позволяет конвертировать цену из одной единицы измерения в другую.
+     * Устанавливает цену за единицу с учетом единицы измерения веса. Позволяет
+     * конвертировать цену из одной единицы измерения в другую.
      */
     @Override
     public void setUnitPriceWithWeightUnit(long unitPrice, int weightUnit,
             int weightNumerator, int weightDenominator) throws JposException {
-        logger.debug("setUnitPriceWithWeightUnit(unitPrice=" + unitPrice + 
-                ", weightUnit=" + weightUnit + 
-                ", weightNumerator=" + weightNumerator + 
-                ", weightDenominator=" + weightDenominator + ")");
+        logger.debug("setUnitPriceWithWeightUnit(unitPrice=" + unitPrice
+                + ", weightUnit=" + weightUnit
+                + ", weightNumerator=" + weightNumerator
+                + ", weightDenominator=" + weightDenominator + ")");
         checkEnabled();
-        
+
         if (!capSetUnitPriceWithWeightUnit) {
             throw new JposException(JPOS_E_ILLEGAL, "Set unit price with weight unit not supported");
         }
-        
+
         // Проверка допустимых единиц измерения
-        if (weightUnit != SCAL_WU_GRAM && weightUnit != SCAL_WU_KILOGRAM &&
-            weightUnit != SCAL_WU_OUNCE && weightUnit != SCAL_WU_POUND) {
+        if (weightUnit != SCAL_WU_GRAM && weightUnit != SCAL_WU_KILOGRAM
+                && weightUnit != SCAL_WU_OUNCE && weightUnit != SCAL_WU_POUND) {
             throw new JposException(JPOS_E_ILLEGAL, "Invalid weight unit: " + weightUnit);
         }
-        
+
         if (weightNumerator <= 0 || weightDenominator <= 0) {
             throw new JposException(JPOS_E_ILLEGAL, "Weight numerator and denominator must be positive");
         }
-        
+
         try {
             // Конвертируем цену в базовую единицу (граммы) для внутреннего хранения
             long convertedPrice = unitPrice;
-            
+
             // Если целевая единица отличается от базовой, конвертируем
             if (weightUnit != this.weightUnit) {
                 // Преобразование через граммы
@@ -1537,13 +1542,12 @@ public class ScaleService extends Scale implements ScaleService114 {
                 }
                 // Аналогично для фунтов и унций
             }
-            
+
             this.unitPrice = convertedPrice;
             logger.debug("setUnitPriceWithWeightUnit: OK, converted unitPrice=" + convertedPrice);
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("setUnitPriceWithWeightUnit error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1596,17 +1600,16 @@ public class ScaleService extends Scale implements ScaleService114 {
     }
 
     // ======================== МЕТОДЫ СТАТИСТИКИ UPOS ========================
-    
     @Override
     public void resetStatistics(String statisticsBuffer) throws JposException {
         logger.debug("resetStatistics(" + statisticsBuffer + ")");
         checkClaimed();
         checkDisabled();  // Согласно UPOS, сброс статистики должен выполняться при отключенном устройстве
-        
+
         if (statistics == null) {
             throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
         }
-        
+
         try {
             // Парсим statisticsBuffer (может содержать список счетчиков для сброса)
             // Если пусто или "*" - сбрасываем всё
@@ -1619,8 +1622,10 @@ public class ScaleService extends Scale implements ScaleService114 {
                 String[] counters = statisticsBuffer.split("[ ,;]+");
                 for (String counter : counters) {
                     String trimmed = counter.trim();
-                    if (trimmed.isEmpty()) continue;
-                    
+                    if (trimmed.isEmpty()) {
+                        continue;
+                    }
+
                     switch (trimmed) {
                         case "HoursPoweredCount":
                             // Сброс часов требует особого подхода (обычно не сбрасывается)
@@ -1639,9 +1644,8 @@ public class ScaleService extends Scale implements ScaleService114 {
                 logger.debug("resetStatistics: selective reset completed");
             }
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("resetStatistics error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1650,30 +1654,29 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("retrieveStatistics(" + statisticsBuffer + ")");
         checkClaimed();
         checkEnabled();  // Согласно UPOS, статистика должна собираться при включенном устройстве
-        
+
         if (statistics == null) {
             throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
         }
-        
+
         if (statisticsBuffer == null || statisticsBuffer.length == 0) {
             throw new JposException(JPOS_E_ILLEGAL, "Invalid statistics buffer");
         }
-        
+
         try {
             // Актуализируем статистику перед возвратом
             if (scale != null && statistics != null) {
                 // Обновляем часы работы
                 statistics.updateHoursPowered();
             }
-            
+
             // Возвращаем XML со статистикой
             statisticsBuffer[0] = statistics.toXML();
             logger.debug("retrieveStatistics: OK, statistics=\n" + statisticsBuffer[0]);
-            
+
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("retrieveStatistics error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1682,29 +1685,28 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("updateStatistics(" + statisticsBuffer + ")");
         checkClaimed();
         checkEnabled();
-        
+
         if (statistics == null) {
             throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
         }
-        
+
         try {
             // updateStatistics используется для обновления статистики, хранящейся на самом устройстве
             // Для весов, которые не хранят статистику внутри себя, можно либо игнорировать,
             // либо использовать для принудительного обновления счетчиков извне
-            
+
             if (statisticsBuffer != null && !statisticsBuffer.isEmpty()) {
                 // Парсим XML и обновляем соответствующие счетчики
                 // Это опционально, так как большинство драйверов просто игнорируют этот метод
                 logger.debug("updateStatistics: parsing XML to update counters");
                 // TODO: Реализовать парсинг XML для обновления счетчиков, если необходимо
             }
-            
+
             logger.debug("updateStatistics: OK (no operation needed for this device)");
-            
+
         } catch (Exception e) {
-            JposException je = getJposException(e);
             logger.error("updateStatistics error: " + e.getMessage());
-            throw je;
+            throw getJposException(e);
         }
     }
 
@@ -1737,7 +1739,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             switch (scale.getType()) {
                 case Pos2:
                     // Для Pos2 используем описание из deviceMetrics
-                    if (deviceMetrics != null && deviceMetrics.getDescription() != null 
+                    if (deviceMetrics != null && deviceMetrics.getDescription() != null
                             && !deviceMetrics.getDescription().isEmpty()) {
                         result = deviceMetrics.getDescription();
                     } else {
@@ -1927,14 +1929,17 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("Poll thread started");
         try {
             while (!Thread.interrupted() && deviceEnabled) {
-                readScaleWeight();
+                try {
+                    readScaleWeight();
+                } catch (Exception e) 
+                {
+                    setPowerState(JPOS_PS_OFF_OFFLINE);
+                }
                 Thread.sleep(POLL_INTERVAL_MS);
             }
         } catch (InterruptedException e) {
             logger.debug("Poll thread interrupted");
             Thread.currentThread().interrupt();
-        } catch (Exception e) {
-            logger.error("Poll thread error", e);
         } finally {
             logger.debug("Poll thread stopped");
         }
@@ -1944,27 +1949,27 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("Event thread started");
         try {
             while (!Thread.interrupted()) {
-                
+
                 // Смотрим первый элемент в очереди, не извлекая
                 JposEvent event = eventQueue.peek();
-                
+
                 if (event == null) {
                     Thread.sleep(10);
                     continue;
                 }
-                
+
                 boolean canDeliver;
                 if (event instanceof DataEvent) {
                     canDeliver = deviceEnabled && dataEventEnabled && !freezeEvents;
                 } else {
                     canDeliver = !freezeEvents;
                 }
-                
+
                 if (canDeliver) {
                     // Можем доставить - теперь извлекаем
                     eventQueue.poll();
                     fireJposEvent(event);
-                    
+
                     // Специальная обработка для разных типов событий
                     if (event instanceof DataEvent && autoDisable) {
                         logger.debug("AutoDisable: disabling device after DataEvent delivery");
@@ -1974,7 +1979,7 @@ public class ScaleService extends Scale implements ScaleService114 {
                             logger.error("AutoDisable failed: " + e.getMessage());
                         }
                     }
-                    
+
                     if (event instanceof ErrorEvent) {
                         handleErrorResponse((ErrorEvent) event);
                     }
@@ -2106,7 +2111,8 @@ public class ScaleService extends Scale implements ScaleService114 {
             ScaleWeight weight = null;
             try {
                 weight = scale.getWeight();
-            } catch (DeviceError e) {
+            } catch (DeviceError e) 
+            {
                 // Ошибка связи - увеличиваем счетчик ошибок связи
                 if (statistics != null) {
                     statistics.incrementCommunicationErrorCount();
@@ -2143,7 +2149,9 @@ public class ScaleService extends Scale implements ScaleService114 {
         }
     }
 
-    private void generateStatusEvents(ScaleWeight newWeight) {
+    private void generateStatusEvents(ScaleWeight newWeight) 
+    {
+        setPowerState(JPOS_PS_ONLINE);
         if (statusNotify != SCAL_SN_ENABLED) {
             return;
         }
@@ -2173,7 +2181,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     private void addEvent(JposEvent event) {
         eventQueue.offer(event);
     }
-    
+
     private void addStatusEvent(int status) {
         if (status >= SCL_SUE_STABLE_WEIGHT && status <= SCAL_SUE_WEIGHT_UNDER_ZERO) {
             if (statusNotify == SCAL_SN_ENABLED) {
@@ -2243,8 +2251,6 @@ public class ScaleService extends Scale implements ScaleService114 {
 
     // ======================== ОБРАБОТКА ИСКЛЮЧЕНИЙ ========================
     private JposException getJposException(Exception e) {
-        logger.error("Exception caught", e);
-
         if (e instanceof JposException) {
             return (JposException) e;
         }
@@ -2259,7 +2265,6 @@ public class ScaleService extends Scale implements ScaleService114 {
                     return new JposException(JPOS_E_FAILURE, e.getMessage());
             }
         }
-
         return new JposException(JPOS_E_FAILURE, e.getMessage());
     }
 
@@ -2278,19 +2283,19 @@ public class ScaleService extends Scale implements ScaleService114 {
         logger.debug("getPollEnabled: " + pollEnabled);
         return pollEnabled;
     }
-    
+
     /**
-     * Возвращает XML с информацией об устройстве (Device Information)
-     * Этот метод не является частью стандарта UPOS, но может быть полезен
+     * Возвращает XML с информацией об устройстве (Device Information) Этот
+     * метод не является частью стандарта UPOS, но может быть полезен
      */
     public String retrieveDeviceInformation() throws JposException {
         logger.debug("retrieveDeviceInformation()");
         checkOpened();
-        
+
         if (statistics == null) {
             throw new JposException(JPOS_E_FAILURE, "Statistics not initialized");
         }
-        
+
         return statistics.getDeviceInformationXML();
     }
 }
