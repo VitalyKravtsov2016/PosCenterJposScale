@@ -6,9 +6,26 @@ import static jpos.ScaleConst.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GraphicsEnvironment;
+import java.awt.GridLayout;
+import java.lang.reflect.InvocationTargetException;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 import ru.poscenter.DeviceError;
 import ru.poscenter.IDevice;
@@ -67,6 +84,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     private int tareWeight = 0;
     private long unitPrice = 0;
     private long salesPrice = 0;
+    private String checkHealthText = "";
 
     // Новые свойства для Scale 1.14
     private int minimumWeight = 0;
@@ -193,6 +211,18 @@ public class ScaleService extends Scale implements ScaleService114 {
 
             StringBuilder sb = new StringBuilder();
             sb.append("<UnifiedPOSStatisticsContext>\n");
+
+            // Device Information
+            sb.append("    <UnifiedPOSVersion>").append(unifiedPOSVersion).append("</UnifiedPOSVersion>\n");
+            sb.append("    <DeviceCategory>").append(deviceCategory).append("</DeviceCategory>\n");
+            sb.append("    <ManufacturerName>").append(escapeXML(manufacturerName)).append("</ManufacturerName>\n");
+            sb.append("    <ModelName>").append(escapeXML(modelName)).append("</ModelName>\n");
+            sb.append("    <SerialNumber>").append(escapeXML(serialNumber)).append("</SerialNumber>\n");
+            sb.append("    <ManufactureDate>").append(escapeXML(manufactureDate)).append("</ManufactureDate>\n");
+            sb.append("    <MechanicalRevision>").append(escapeXML(mechanicalRevision)).append("</MechanicalRevision>\n");
+            sb.append("    <FirmwareRevision>").append(escapeXML(firmwareRevision)).append("</FirmwareRevision>\n");
+            sb.append("    <Interface>").append(escapeXML(interfaceType)).append("</Interface>\n");
+            sb.append("    <InstallationDate>").append(escapeXML(installationDate)).append("</InstallationDate>\n");
 
             // Common Statistics
             sb.append("    <HoursPoweredCount>").append(hoursPoweredCount).append("</HoursPoweredCount>\n");
@@ -522,7 +552,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     public boolean getCapPriceCalculating() throws JposException {
         logger.debug("getCapPriceCalculating");
         checkOpened();
-        boolean result = false;
+        boolean result = capSetPriceCalculationMode;
         logger.debug("getCapPriceCalculating: " + result);
         return result;
     }
@@ -590,6 +620,9 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void setStatusNotify(int statusNotify) throws JposException {
         logger.debug("setStatusNotify(" + statusNotify + ")");
         checkDisabled();
+        if (statusNotify != SCAL_SN_DISABLED && statusNotify != SCAL_SN_ENABLED) {
+            throw new JposException(JPOS_E_ILLEGAL, "Invalid StatusNotify value: " + statusNotify);
+        }
         this.statusNotify = statusNotify;
         logger.debug("setStatusNotify: OK");
     }
@@ -661,6 +694,9 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void setPowerNotify(int powerNotify) throws JposException {
         logger.debug("setPowerNotify(" + powerNotify + ")");
         checkDisabled();
+        if (powerNotify != JPOS_PN_DISABLED && powerNotify != JPOS_PN_ENABLED) {
+            throw new JposException(JPOS_E_ILLEGAL, "Invalid PowerNotify value: " + powerNotify);
+        }
         this.powerNotify = powerNotify;
         logger.debug("setPowerNotify: OK");
     }
@@ -1558,9 +1594,26 @@ public class ScaleService extends Scale implements ScaleService114 {
     @Override
     public void checkHealth(int level) throws JposException {
         logger.debug("checkHealth(" + level + ")");
-        JposException e = new JposException(JPOS_E_ILLEGAL, "Not supported");
-        logger.error("checkHealth: " + e.getMessage());
-        throw e;
+        checkOpened();
+
+        switch (level) {
+            case JPOS_CH_INTERNAL:
+                checkHealthText = "Internal check OK: service opened, state="
+                        + JposUtils.getStateText(state);
+                break;
+            case JPOS_CH_EXTERNAL:
+                checkClaimed();
+                readScaleWeight();
+                checkHealthText = "External check OK: scale communication is available";
+                break;
+            case JPOS_CH_INTERACTIVE:
+                checkClaimed();
+                showInteractiveHealthDialog();
+                break;
+            default:
+                throw new JposException(JPOS_E_ILLEGAL, "Invalid checkHealth level: " + level);
+        }
+        logger.debug("checkHealth: OK, text=" + checkHealthText);
     }
 
     @Override
@@ -1574,8 +1627,180 @@ public class ScaleService extends Scale implements ScaleService114 {
     @Override
     public String getCheckHealthText() throws JposException {
         logger.debug("getCheckHealthText()");
-        logger.debug("getCheckHealthText: ");
-        return "";
+        checkOpened();
+        logger.debug("getCheckHealthText: " + checkHealthText);
+        return checkHealthText;
+    }
+
+    private void showInteractiveHealthDialog() throws JposException {
+        if (GraphicsEnvironment.isHeadless()) {
+            throw new JposException(JPOS_E_ILLEGAL, "Interactive checkHealth is not available in headless mode");
+        }
+
+        final JposException[] error = new JposException[1];
+        Runnable dialogTask = () -> {
+            JDialog dialog = new JDialog((java.awt.Frame) null, "Дисплей весов", true);
+            JLabel weightLabel = new JLabel("0,0000", SwingConstants.RIGHT);
+            weightLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 42));
+            weightLabel.setForeground(new Color(0, 130, 200));
+            JLabel unitLabel = new JLabel("кг");
+            unitLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+            JLabel tareLabel = new JLabel("0,0000 кг", SwingConstants.RIGHT);
+            tareLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
+            JLabel zeroLabel = new JLabel("Нуль: ?");
+            JLabel tareStateLabel = new JLabel("Тара: ?");
+            JLabel stableLabel = new JLabel("Успокоение: ?");
+            JLabel fixedLabel = new JLabel("Фиксация: ?");
+            AtomicBoolean reading = new AtomicBoolean(false);
+
+            JPanel weightPanel = new JPanel(new BorderLayout(10, 0));
+            weightPanel.setBorder(BorderFactory.createTitledBorder("Вес"));
+            weightPanel.add(weightLabel, BorderLayout.CENTER);
+            weightPanel.add(unitLabel, BorderLayout.EAST);
+
+            JPanel tarePanel = new JPanel(new BorderLayout());
+            tarePanel.setBorder(BorderFactory.createTitledBorder("Тара"));
+            tarePanel.add(tareLabel, BorderLayout.CENTER);
+
+            JPanel statusPanel = new JPanel(new GridLayout(4, 1, 4, 4));
+            statusPanel.add(zeroLabel);
+            statusPanel.add(tareStateLabel);
+            statusPanel.add(stableLabel);
+            statusPanel.add(fixedLabel);
+
+            JButton closeButton = new JButton("Закрыть");
+            closeButton.addActionListener(e -> dialog.dispose());
+            JButton tareButton = new JButton(">T<");
+            tareButton.setToolTipText("Установить тару по текущему весу");
+            tareButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+            tareButton.addActionListener(e -> runInteractiveScaleCommand(
+                    "Interactive tare",
+                    weightLabel,
+                    () -> {
+                        ScaleWeight weight = readScaleWeight();
+                        if (weight == null || weight.status == null) {
+                            throw new JposException(JPOS_E_FAILURE, "No weight data");
+                        }
+                        setTareWeight((int) weight.weight);
+                    }));
+            JButton zeroButton = new JButton(">0<");
+            zeroButton.setToolTipText("Установить ноль");
+            zeroButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+            zeroButton.addActionListener(e -> runInteractiveScaleCommand(
+                    "Interactive zero",
+                    weightLabel,
+                    this::zeroScale));
+            JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            buttons.add(tareButton);
+            buttons.add(zeroButton);
+            buttons.add(closeButton);
+
+            JPanel center = new JPanel(new BorderLayout(8, 8));
+            center.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+            center.add(weightPanel, BorderLayout.CENTER);
+            center.add(tarePanel, BorderLayout.EAST);
+            center.add(statusPanel, BorderLayout.SOUTH);
+
+            Timer timer = new Timer(POLL_INTERVAL_MS, e -> {
+                if (!reading.compareAndSet(false, true)) {
+                    return;
+                }
+                Thread reader = new Thread(() -> {
+                    try {
+                        ScaleWeight weight = readScaleWeight();
+                        if (weight != null && weight.status != null) {
+                            SwingUtilities.invokeLater(() -> {
+                                weightLabel.setText(formatKilograms(weight.weight));
+                                tareLabel.setText(formatKilograms(tareWeight) + " кг");
+                                zeroLabel.setText("Нуль: " + (weight.weight == 0 ? "да" : "нет"));
+                                tareStateLabel.setText("Тара: " + (tareWeight != 0 ? "да" : "нет"));
+                                stableLabel.setText("Успокоение: " + (weight.status.isStable() ? "да" : "нет"));
+                                fixedLabel.setText("Фиксация: " + (weight.status.isOverweight() ? "перегруз" : "нет"));
+                                checkHealthText = "Interactive check OK: weight=" + weight.weight
+                                        + " g, stable=" + weight.status.isStable();
+                            });
+                        }
+                    } catch (JposException ex) {
+                        SwingUtilities.invokeLater(() -> {
+                            checkHealthText = "Interactive check failed: " + ex.getMessage();
+                            weightLabel.setText("ERR");
+                        });
+                    } finally {
+                        reading.set(false);
+                    }
+                }, "ScaleInteractiveHealthReader");
+                reader.setDaemon(true);
+                reader.start();
+            });
+            timer.setInitialDelay(0);
+            dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosed(java.awt.event.WindowEvent e) {
+                    timer.stop();
+                }
+            });
+
+            dialog.setLayout(new BorderLayout());
+            dialog.add(center, BorderLayout.CENTER);
+            dialog.add(buttons, BorderLayout.SOUTH);
+            dialog.setSize(420, 260);
+            dialog.setLocationRelativeTo(null);
+            timer.start();
+            dialog.setVisible(true);
+            timer.stop();
+            if (checkHealthText == null || checkHealthText.isEmpty()) {
+                checkHealthText = "Interactive check closed";
+            }
+        };
+
+        try {
+            if (SwingUtilities.isEventDispatchThread()) {
+                dialogTask.run();
+            } else {
+                SwingUtilities.invokeAndWait(dialogTask);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new JposException(JPOS_E_FAILURE, "Interactive checkHealth interrupted");
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            throw new JposException(JPOS_E_FAILURE, cause == null ? e.getMessage() : cause.getMessage());
+        }
+
+        if (error[0] != null) {
+            throw error[0];
+        }
+    }
+
+    private static String formatKilograms(long grams) {
+        long sign = grams < 0 ? -1 : 1;
+        long abs = Math.abs(grams);
+        long integer = abs / 1000;
+        long fraction = (abs % 1000) * 10;
+        return (sign < 0 ? "-" : "") + integer + "," + String.format("%04d", fraction);
+    }
+
+    @FunctionalInterface
+    private interface InteractiveScaleCommand {
+
+        void run() throws JposException;
+    }
+
+    private void runInteractiveScaleCommand(String name, JLabel weightLabel, InteractiveScaleCommand command) {
+        Thread worker = new Thread(() -> {
+            try {
+                command.run();
+                checkHealthText = name + " OK";
+            } catch (JposException ex) {
+                checkHealthText = name + " failed: " + ex.getMessage();
+                SwingUtilities.invokeLater(() -> weightLabel.setText("ERR"));
+            }
+        }, name.replace(' ', '-') + "-Thread");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     @Override
@@ -1821,7 +2046,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             }
 
             if (System.currentTimeMillis() > startTime + timeout) {
-                return weight.weight;
+                throw new JposException(JPOS_E_TIMEOUT, "Timeout waiting for stable weight");
             }
 
             Thread.sleep(10);
@@ -2038,7 +2263,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             DataEvent dataEvent = new DataEvent(this, (int) weight);
             addEvent(dataEvent);
             if (autoDisable) {
-                logger.debug("AutoDisable: disabling device after DataEvent delivery");
+                logger.debug("AutoDisable: disabling device after DataEvent enqueue");
                 try {
                     setDeviceEnabled(false);
                 } catch (JposException e) {

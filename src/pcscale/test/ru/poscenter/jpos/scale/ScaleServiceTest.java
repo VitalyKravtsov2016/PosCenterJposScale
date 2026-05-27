@@ -344,6 +344,26 @@ public class ScaleServiceTest {
     }
 
     /**
+     * Тест: таймаут асинхронного чтения должен приходить как ErrorEvent.
+     */
+    @Test
+    public void testAsyncReadWeightTimeoutProducesErrorEvent() throws Exception {
+        testScale.setCurrentWeight(1234, false, false);
+
+        initService(false, true);
+        service.readWeight(null, 1);
+
+        ErrorEvent errorEvent = callbacks.waitForEvent(ErrorEvent.class, 3000);
+        assertNotNull("Должно быть получено ErrorEvent по таймауту", errorEvent);
+        assertEquals(JposConst.JPOS_E_TIMEOUT, errorEvent.getErrorCode());
+        assertEquals(JposConst.JPOS_ER_CLEAR, errorEvent.getErrorResponse());
+        Thread.sleep(100);
+        assertEquals(JposConst.JPOS_S_IDLE, service.getCurrentState());
+
+        cleanup();
+    }
+
+    /**
      * Тест: retryable ErrorEvent содержит свой WeightRequest и повторяет запрос
      * без общего поля currentRequest.
      */
@@ -463,11 +483,36 @@ public class ScaleServiceTest {
         assertTrue(service.getCapUpdateStatistics());
         assertFalse(service.getCapDisplayText());
         assertEquals(JposConst.JPOS_PR_STANDARD, service.getCapPowerReporting());
+        assertEquals(service.getCapSetPriceCalculationMode(), service.getCapPriceCalculating());
 
         // Эти capability зависят от типа весов
-        service.getCapPriceCalculating();
         service.getCapTareWeight();
         service.getCapZeroScale();
+
+        service.close();
+    }
+
+    /**
+     * Тест: checkHealth INTERNAL/EXTERNAL заполняет CheckHealthText.
+     */
+    @Test
+    public void testCheckHealth() throws Exception {
+        testScale.setCurrentWeight(1234, true, false);
+
+        service.open("TestScale", callbacks);
+        service.checkHealth(JposConst.JPOS_CH_INTERNAL);
+        assertTrue(service.getCheckHealthText().contains("Internal check OK"));
+
+        service.claim(0);
+        service.checkHealth(JposConst.JPOS_CH_EXTERNAL);
+        assertTrue(service.getCheckHealthText().contains("External check OK"));
+
+        try {
+            service.checkHealth(999);
+            fail("Должно быть исключение при неверном уровне checkHealth");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
 
         service.close();
     }
@@ -668,6 +713,21 @@ public class ScaleServiceTest {
         service.setDeviceEnabled(false);
         service.setStatusNotify(ScaleConst.SCAL_SN_ENABLED);
         assertEquals(ScaleConst.SCAL_SN_ENABLED, service.getStatusNotify());
+        try {
+            service.setStatusNotify(999);
+            fail("Должно быть исключение при неверном StatusNotify");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
+
+        service.setPowerNotify(JposConst.JPOS_PN_ENABLED);
+        assertEquals(JposConst.JPOS_PN_ENABLED, service.getPowerNotify());
+        try {
+            service.setPowerNotify(999);
+            fail("Должно быть исключение при неверном PowerNotify");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_ILLEGAL, e.getErrorCode());
+        }
 
         service.setDataEventEnabled(true);
         assertTrue(service.getDataEventEnabled());
@@ -779,6 +839,29 @@ public class ScaleServiceTest {
     public void testResetStatisticsNotSupported() throws Exception {
         initService(false);
         service.resetStatistics("");
+        cleanup();
+    }
+
+    /**
+     * Тест: retrieveStatistics возвращает UPOS statistics с device information.
+     */
+    @Test
+    public void testRetrieveStatisticsContainsDeviceInformation() throws Exception {
+        testScale.setCurrentWeight(500, true, false);
+
+        initService(false, false);
+        int[] weight = new int[1];
+        service.readWeight(weight, 1000);
+
+        String[] statistics = new String[1];
+        service.retrieveStatistics(statistics);
+
+        assertNotNull(statistics[0]);
+        assertTrue(statistics[0].contains("<UnifiedPOSStatisticsContext>"));
+        assertTrue(statistics[0].contains("<UnifiedPOSVersion>1.15</UnifiedPOSVersion>"));
+        assertTrue(statistics[0].contains("<DeviceCategory>Scale</DeviceCategory>"));
+        assertTrue(statistics[0].contains("<GoodWeightReadCount>"));
+
         cleanup();
     }
 
