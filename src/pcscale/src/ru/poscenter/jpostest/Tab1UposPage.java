@@ -8,6 +8,8 @@ import java.awt.event.*;
 import jpos.JposConst;
 import jpos.JposException;
 import jpos.Scale;
+import jpos.events.DataEvent;
+import jpos.events.DataListener;
 
 import ru.poscenter.jpos.JposUtils;
 
@@ -22,7 +24,7 @@ import ru.poscenter.jpos.JposUtils;
  *   getPhysicalDeviceName, getPhysicalDeviceDescription
  * Группа "Операции":  checkHealth, directIO
  */
-public class Tab1UposPage extends JPanel {
+public class Tab1UposPage extends JPanel implements DataListener {
 
     private final Scale scale;
     private final Tab4EventsPage eventsPage;
@@ -50,6 +52,9 @@ public class Tab1UposPage extends JPanel {
 
     // -- Result --
     private JTextArea taResult;
+
+    /** Синхронизация чекбоксов из драйвера — без повторного вызова set*. */
+    private boolean syncingUi;
 
     public Tab1UposPage(Scale scale, Tab4EventsPage eventsPage) {
         this.scale = scale;
@@ -136,12 +141,20 @@ public class Tab1UposPage extends JPanel {
 
         cbDeviceEnabled = new JCheckBox("DeviceEnabled");
         cbDeviceEnabled.setToolTipText("setDeviceEnabled / getDeviceEnabled");
-        cbDeviceEnabled.addItemListener(e -> doSetDeviceEnabled(cbDeviceEnabled.isSelected()));
+        cbDeviceEnabled.addItemListener(e -> {
+            if (!syncingUi) {
+                doSetDeviceEnabled(cbDeviceEnabled.isSelected());
+            }
+        });
         p.add(cbDeviceEnabled);
 
         cbFreezeEvents = new JCheckBox("FreezeEvents");
         cbFreezeEvents.setToolTipText("setFreezeEvents / getFreezeEvents");
-        cbFreezeEvents.addItemListener(e -> doSetFreezeEvents(cbFreezeEvents.isSelected()));
+        cbFreezeEvents.addItemListener(e -> {
+            if (!syncingUi) {
+                doSetFreezeEvents(cbFreezeEvents.isSelected());
+            }
+        });
         p.add(cbFreezeEvents);
 
         btnRefreshState = new JButton("Обновить");
@@ -212,7 +225,8 @@ public class Tab1UposPage extends JPanel {
         try {
             String name = tfLogicalName.getText().trim();
             scale.open(name);
-            // Регистрируем слушателей событий
+            // Регистрируем слушателей событий (несколько DataListener допускается)
+            scale.addDataListener(this);
             scale.addDataListener(eventsPage);
             scale.addErrorListener(eventsPage);
             scale.addStatusUpdateListener(eventsPage);
@@ -227,6 +241,7 @@ public class Tab1UposPage extends JPanel {
 
     private void doClose() {
         try {
+            scale.removeDataListener(this);
             scale.removeDataListener(eventsPage);
             scale.removeErrorListener(eventsPage);
             scale.removeStatusUpdateListener(eventsPage);
@@ -330,32 +345,45 @@ public class Tab1UposPage extends JPanel {
         }
     }
 
+    // ======================= DataListener =======================
+
+    @Override
+    public void dataOccurred(DataEvent e) {
+        // AutoDisable и др. могут менять DeviceEnabled в потоке событий
+        SwingUtilities.invokeLater(this::refreshState);
+    }
+
     // ======================= Вспомогательные методы =======================
 
     public void refreshState() {
+        syncingUi = true;
         try {
-            int state = scale.getState();
-            lblState.setText(stateText(state));
-        } catch (Exception e) {
-            lblState.setText("?");
-        }
-        try {
-            lblClaimed.setText(String.valueOf(scale.getClaimed()));
-        } catch (Exception e) {
-            lblClaimed.setText("?");
-        }
-        try {
-            boolean enabled = scale.getDeviceEnabled();
-            if (cbDeviceEnabled.isSelected() != enabled) {
-                cbDeviceEnabled.setSelected(enabled);
+            try {
+                int state = scale.getState();
+                lblState.setText(stateText(state));
+            } catch (Exception e) {
+                lblState.setText("?");
             }
-        } catch (Exception ignored) {}
-        try {
-            boolean freeze = scale.getFreezeEvents();
-            if (cbFreezeEvents.isSelected() != freeze) {
-                cbFreezeEvents.setSelected(freeze);
+            try {
+                lblClaimed.setText(String.valueOf(scale.getClaimed()));
+            } catch (Exception e) {
+                lblClaimed.setText("?");
             }
-        } catch (Exception ignored) {}
+            try {
+                boolean enabled = scale.getDeviceEnabled();
+                if (cbDeviceEnabled.isSelected() != enabled) {
+                    cbDeviceEnabled.setSelected(enabled);
+                }
+            } catch (Exception ignored) {}
+            try {
+                boolean freeze = scale.getFreezeEvents();
+                if (cbFreezeEvents.isSelected() != freeze) {
+                    cbFreezeEvents.setSelected(freeze);
+                }
+            } catch (Exception ignored) {}
+        } finally {
+            syncingUi = false;
+        }
     }
 
     private static String stateText(int state) {

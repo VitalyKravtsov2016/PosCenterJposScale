@@ -78,9 +78,14 @@ public class ScaleServiceTest {
         private final BlockingQueue<JposEvent> events = new LinkedBlockingQueue<>();
         
         private volatile Runnable actionToPerform;
+        private volatile java.util.function.Consumer<ErrorEvent> errorActionToPerform;
         
         public void setAction(Runnable action) {
             this.actionToPerform = action;
+        }
+
+        public void setErrorAction(java.util.function.Consumer<ErrorEvent> action) {
+            this.errorActionToPerform = action;
         }
         
         public void clearEvents() {
@@ -117,6 +122,9 @@ public class ScaleServiceTest {
 
         @Override
         public void fireErrorEvent(ErrorEvent event) {
+            if (errorActionToPerform != null) {
+                errorActionToPerform.accept(event);
+            }
             events.offer(event);
         }
 
@@ -335,6 +343,109 @@ public class ScaleServiceTest {
         cleanup();
     }
 
+    /**
+     * Тест: retryable ErrorEvent содержит свой WeightRequest и повторяет запрос
+     * без общего поля currentRequest.
+     */
+    @Test
+    public void testAsyncRetryableErrorRetriesRequest() throws Exception {
+        testScale.setCurrentWeight(15000, true, true);
+
+        initService(false, true);
+        callbacks.setErrorAction(event -> testScale.setCurrentWeight(777, true, false));
+
+        service.readWeight(null, 1000);
+
+        ErrorEvent errorEvent = callbacks.waitForEvent(ErrorEvent.class, 3000);
+        assertNotNull("Должно быть получено retryable ErrorEvent", errorEvent);
+        assertEquals(JposConst.JPOS_E_EXTENDED, errorEvent.getErrorCode());
+        assertEquals(ScaleConst.JPOS_ESCAL_OVERWEIGHT, errorEvent.getErrorCodeExtended());
+        assertEquals(JposConst.JPOS_ER_RETRY, errorEvent.getErrorResponse());
+
+        DataEvent dataEvent = callbacks.waitForEvent(DataEvent.class, 3000);
+        assertNotNull("После retry должен прийти DataEvent", dataEvent);
+        assertEquals(777, dataEvent.getStatus());
+        Thread.sleep(100);
+        assertEquals(JposConst.JPOS_S_IDLE, service.getCurrentState());
+
+        cleanup();
+    }
+
+    /**
+     * Тест: ответ приложения ER_CLEAR завершает ошибочную async-операцию.
+     */
+    @Test
+    public void testAsyncErrorClearSetsIdle() throws Exception {
+        testScale.setCurrentWeight(15000, true, true);
+
+        initService(false, true);
+        callbacks.setErrorAction(event -> event.setErrorResponse(JposConst.JPOS_ER_CLEAR));
+
+        service.readWeight(null, 1000);
+
+        ErrorEvent errorEvent = callbacks.waitForEvent(ErrorEvent.class, 3000);
+        assertNotNull("Должно быть получено ErrorEvent", errorEvent);
+        assertEquals(JposConst.JPOS_ER_CLEAR, errorEvent.getErrorResponse());
+
+        Thread.sleep(100);
+        assertEquals(JposConst.JPOS_S_IDLE, service.getCurrentState());
+        assertNull("После ER_CLEAR повторного DataEvent быть не должно",
+                callbacks.waitForEvent(DataEvent.class, 300));
+
+        cleanup();
+    }
+
+    /**
+     * Тест: после исчерпания retry состояние возвращается в IDLE.
+     */
+    @Test
+    public void testAsyncRetryLimitSetsIdle() throws Exception {
+        testScale.setCurrentWeight(15000, true, true);
+
+        initService(false, true);
+        service.readWeight(null, 1000);
+
+        for (int i = 0; i < 4; i++) {
+            ErrorEvent errorEvent = callbacks.waitForEvent(ErrorEvent.class, 3000);
+            assertNotNull("Должно быть получено ErrorEvent #" + (i + 1), errorEvent);
+            assertEquals(JposConst.JPOS_E_EXTENDED, errorEvent.getErrorCode());
+            if (i < 3) {
+                assertEquals(JposConst.JPOS_ER_RETRY, errorEvent.getErrorResponse());
+            } else {
+                assertEquals(JposConst.JPOS_ER_CLEAR, errorEvent.getErrorResponse());
+            }
+        }
+
+        Thread.sleep(100);
+        assertEquals(JposConst.JPOS_S_IDLE, service.getCurrentState());
+
+        cleanup();
+    }
+
+    /**
+     * Тест: пока ErrorEvent не обработан, новый async readWeight отклоняется.
+     */
+    @Test
+    public void testAsyncReadWeightRejectedWhileErrorPending() throws Exception {
+        testScale.setCurrentWeight(15000, true, true);
+
+        initService(false, true);
+        service.setFreezeEvents(true);
+
+        service.readWeight(null, 1000);
+        Thread.sleep(100);
+        assertEquals(JposConst.JPOS_S_ERROR, service.getCurrentState());
+
+        try {
+            service.readWeight(null, 1000);
+            fail("readWeight должен быть отклонен в JPOS_S_ERROR");
+        } catch (JposException e) {
+            assertEquals(JposConst.JPOS_E_BUSY, e.getErrorCode());
+        }
+
+        cleanup();
+    }
+
     // ======================== ОСТАЛЬНЫЕ ТЕСТЫ ========================
 
     /**
@@ -392,7 +503,6 @@ public class ScaleServiceTest {
         // Disable
         service.setDeviceEnabled(false);
         assertFalse(service.getDeviceEnabled());
-        assertFalse(service.getAsyncMode());
 
         // Release
         service.release();

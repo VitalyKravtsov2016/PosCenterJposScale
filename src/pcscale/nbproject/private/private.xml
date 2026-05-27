@@ -4,10 +4,17 @@
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
             <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/scale/ScaleCommand.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/scaletst/ScaleTest.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/port/JSerialPort.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/jpos/JposUtils.java</file>
             <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/test/ru/poscenter/jpos/scale/ScaleServiceTest.java</file>
             <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/jpos/scale/ScaleService.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/MainButtonPanel.java</file>
             <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/scale/Pos2Serial.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/scale/ScaleSerial.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/jpostest/Tab4EventsPage.java</file>
             <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/ShtrihMProtocolSerial.java</file>
+            <file>file:/D:/Projects/PosCenter/JposScale/src/pcscale/src/ru/poscenter/jpostest/Tab1UposPage.java</file>
         </group>
     </open-files>
 </project-private>

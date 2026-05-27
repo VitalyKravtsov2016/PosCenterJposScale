@@ -11,7 +11,8 @@ import jpos.events.*;
  * Закладка 4: события JPOS (DataEvent, ErrorEvent, StatusUpdateEvent, DirectIOEvent).
  *
  * Реализует слушатели всех четырёх типов событий.
- * Другие закладки добавляют/удаляют слушателей при открытии/закрытии устройства.
+ * Слушатели регистрируются при open() (Tab1UposPage — свой DataListener для GUI,
+ * Tab4EventsPage — журнал всех событий).
  */
 public class Tab4EventsPage extends JPanel
         implements DataListener, ErrorListener, StatusUpdateListener, DirectIOListener {

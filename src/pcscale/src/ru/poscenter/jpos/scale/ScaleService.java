@@ -6,7 +6,6 @@ import static jpos.ScaleConst.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
@@ -99,10 +98,6 @@ public class ScaleService extends Scale implements ScaleService114 {
 
     // Очередь асинхронных запросов
     private final BlockingQueue<WeightRequest> requestQueue = new LinkedBlockingQueue<>();
-
-    // Управление запросами
-    private volatile WeightRequest currentRequest = null;
-    private final AtomicInteger requestIdGenerator = new AtomicInteger(0);
 
     // Флаги
     private boolean pollEnabled = true;
@@ -285,6 +280,26 @@ public class ScaleService extends Scale implements ScaleService114 {
             WeightRequest copy = new WeightRequest(this.timeout);
             copy.retryCount = this.retryCount + 1;
             return copy;
+        }
+    }
+
+    /**
+     * ErrorEvent с привязкой к асинхронному запросу, который породил ошибку.
+     * Так retry/clear не зависят от общего mutable-состояния между потоками.
+     */
+    private static class RequestErrorEvent extends ErrorEvent {
+
+        private static final long serialVersionUID = 1L;
+        private final WeightRequest request;
+
+        RequestErrorEvent(Object source, WeightRequest request, int errorCode,
+                int errorCodeExtended, int errorLocus, int errorResponse) {
+            super(source, errorCode, errorCodeExtended, errorLocus, errorResponse);
+            this.request = request;
+        }
+
+        public WeightRequest getRequest() {
+            return request;
         }
     }
 
@@ -1011,11 +1026,6 @@ public class ScaleService extends Scale implements ScaleService114 {
                 logger.warn("channelParams is null, using default weight limits");
             }
 
-            // Устанавливаем статистику питания
-            if (statistics != null) {
-                statistics.setPowered(true);
-            }
-
             claimed = true;
             if (deviceMetrics != null) {
                 logger.debug(deviceMetrics.toString());
@@ -1080,10 +1090,6 @@ public class ScaleService extends Scale implements ScaleService114 {
                 deviceEnabled = true;
                 setState(JPOS_S_IDLE);
 
-                // Устанавливаем состояние питания
-                if (statistics != null) {
-                    statistics.setPowered(true);
-                }
                 setPowerState(JPOS_PS_ONLINE);
 
                 startPollThread();
@@ -1092,17 +1098,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             } else {
                 deviceEnabled = false;
                 setState(JPOS_S_IDLE);
-
-                // Фиксируем, что питание выключено
-                if (statistics != null) {
-                    statistics.setPowered(false);
-                }
                 setPowerState(JPOS_PS_UNKNOWN);
-
-                if (asyncMode) {
-                    setAsyncMode(false);
-                }
-
                 stopPollThread();
                 requestQueue.clear();
 
@@ -1129,7 +1125,6 @@ public class ScaleService extends Scale implements ScaleService114 {
         // Очищаем только DataEvent из очереди
         eventQueue.removeIf(event -> event instanceof DataEvent);
         requestQueue.clear();
-        currentRequest = null;
         setState(JPOS_S_IDLE);
 
         logger.debug("clearInput: OK");
@@ -1156,7 +1151,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             if (asyncMode) {
                 // Атомарная проверка и установка состояния
                 synchronized (this) {
-                    if (state == JPOS_S_BUSY) {
+                    if (state == JPOS_S_BUSY || state == JPOS_S_ERROR) {
                         throw new JposException(JPOS_E_BUSY, "Asynchronous operation already in progress");
                     }
                     setState(JPOS_S_BUSY);
@@ -1901,7 +1896,6 @@ public class ScaleService extends Scale implements ScaleService114 {
         weightThread = new Thread(new WeightTarget(this), "ScaleWeightThread");
         weightThread.setDaemon(true);
         weightThread.start();
-        logger.debug("Weight thread started");
     }
 
     private void stopWeightThread() {
@@ -1910,11 +1904,9 @@ public class ScaleService extends Scale implements ScaleService114 {
             try {
                 weightThread.join(THREAD_STOP_TIMEOUT_MS);
             } catch (InterruptedException e) {
-                logger.error("Error stopping weightThread", e);
                 Thread.currentThread().interrupt();
             }
             weightThread = null;
-            logger.debug("Weight thread stopped");
         }
     }
 
@@ -1960,7 +1952,7 @@ public class ScaleService extends Scale implements ScaleService114 {
 
                 boolean canDeliver;
                 if (event instanceof DataEvent) {
-                    canDeliver = deviceEnabled && dataEventEnabled && !freezeEvents;
+                    canDeliver = dataEventEnabled && !freezeEvents;
                 } else {
                     canDeliver = !freezeEvents;
                 }
@@ -1969,16 +1961,6 @@ public class ScaleService extends Scale implements ScaleService114 {
                     // Можем доставить - теперь извлекаем
                     eventQueue.poll();
                     fireJposEvent(event);
-
-                    // Специальная обработка для разных типов событий
-                    if (event instanceof DataEvent && autoDisable) {
-                        logger.debug("AutoDisable: disabling device after DataEvent delivery");
-                        try {
-                            setDeviceEnabled(false);
-                        } catch (JposException e) {
-                            logger.error("AutoDisable failed: " + e.getMessage());
-                        }
-                    }
 
                     if (event instanceof ErrorEvent) {
                         handleErrorResponse((ErrorEvent) event);
@@ -2001,36 +1983,37 @@ public class ScaleService extends Scale implements ScaleService114 {
     private void handleErrorResponse(ErrorEvent errorEvent) {
         int response = errorEvent.getErrorResponse();
         logger.debug("handleErrorResponse: response=" + response);
+        WeightRequest request = errorEvent instanceof RequestErrorEvent
+                ? ((RequestErrorEvent) errorEvent).getRequest()
+                : null;
 
         if (response == JPOS_ER_RETRY) {
             logger.debug("ER_RETRY received");
 
-            if (currentRequest != null && currentRequest.getRetryCount() < MAX_RETRY_COUNT) {
-                WeightRequest retryRequest = currentRequest.copy();
+            if (request != null && request.getRetryCount() < MAX_RETRY_COUNT) {
+                WeightRequest retryRequest = request.copy();
                 logger.debug("Retry #" + retryRequest.getRetryCount() + "/" + MAX_RETRY_COUNT
-                        + " for request #" + currentRequest.getId());
+                        + " for request #" + request.getId());
 
-                requestQueue.offer(retryRequest);
                 setState(JPOS_S_BUSY);
+                requestQueue.offer(retryRequest);
             } else {
                 logger.debug("Max retries exceeded or no current request");
                 setState(JPOS_S_IDLE);
-                currentRequest = null;
             }
         } else if (response == JPOS_ER_CLEAR) {
             logger.debug("ER_CLEAR received");
             setState(JPOS_S_IDLE);
-            currentRequest = null;
         }
     }
 
     public void weightProc() {
         logger.debug("Weight thread started");
         try {
-            while (!Thread.interrupted() && deviceEnabled && asyncMode) {
+            while (!Thread.interrupted()) 
+            {
                 try {
                     WeightRequest request = requestQueue.take();
-                    currentRequest = request;
                     logger.debug("Processing request #" + request.getId()
                             + ", timeout=" + request.getTimeout()
                             + ", retry=" + request.getRetryCount());
@@ -2045,7 +2028,6 @@ public class ScaleService extends Scale implements ScaleService114 {
                 }
             }
         } finally {
-            currentRequest = null;
             logger.debug("Weight thread stopped");
         }
     }
@@ -2055,8 +2037,16 @@ public class ScaleService extends Scale implements ScaleService114 {
             long weight = readWeightAsync(request.getTimeout());
             DataEvent dataEvent = new DataEvent(this, (int) weight);
             addEvent(dataEvent);
+            if (autoDisable) {
+                logger.debug("AutoDisable: disabling device after DataEvent delivery");
+                try {
+                    setDeviceEnabled(false);
+                } catch (JposException e) {
+                    logger.error("AutoDisable failed: " + e.getMessage());
+                }
+            }
+
             setState(JPOS_S_IDLE);
-            currentRequest = null;
             logger.debug("Weight request processed, weight=" + weight);
 
         } catch (JposException e) {
@@ -2065,22 +2055,23 @@ public class ScaleService extends Scale implements ScaleService114 {
             logger.debug("Weight request interrupted");
             Thread.currentThread().interrupt();
             setState(JPOS_S_IDLE);
-            currentRequest = null;
         }
     }
 
     private void handleWeightError(JposException e, WeightRequest request) {
         boolean canRetry = isRetryableError(e) && request.getRetryCount() < MAX_RETRY_COUNT;
 
-        ErrorEvent errorEvent = new ErrorEvent(
+        setState(JPOS_S_ERROR);
+
+        ErrorEvent errorEvent = new RequestErrorEvent(
                 this,
+                request,
                 e.getErrorCode(),
                 e.getErrorCodeExtended(),
                 JPOS_EL_INPUT,
                 canRetry ? JPOS_ER_RETRY : JPOS_ER_CLEAR
         );
 
-        setState(JPOS_S_ERROR);
         addEvent(errorEvent);
         logger.debug("Error event queued for request #" + request.getId()
                 + ", canRetry=" + canRetry
@@ -2213,7 +2204,13 @@ public class ScaleService extends Scale implements ScaleService114 {
     }
 
     // ======================== УПРАВЛЕНИЕ ПИТАНИЕМ ========================
-    public void setPowerState(int newPowerState) {
+    public void setPowerState(int newPowerState) 
+    {
+        // Устанавливаем состояние питания
+        if (statistics != null) {
+            statistics.setPowered(newPowerState == JPOS_PS_ONLINE);
+        }
+        
         if (powerNotify == JPOS_PN_ENABLED && newPowerState != this.powerState) {
             switch (newPowerState) {
                 case JPOS_PS_ONLINE:
