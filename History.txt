@@ -6,13 +6,14 @@
       
 ********************************************************************************
 
-  May, 27 2026 13:20
+  May, 27 2026 14:40
   deviceServiceVersion = 1014010
 
   [-] Fixed error with cable or virtual serial port disconnection
   [-] Fixed error with setting AsyncMode=false when setDeviceEnabled(false)
   [+] Added error code names on driver test page
   [+] Added log file rotation
+  [+] Added checkHealth implementation
   
 ********************************************************************************
 
