@@ -4,13 +4,13 @@ package ru.poscenter.jpos;
 import jpos.JposConst;
 import jpos.JposException;
 import jpos.config.JposEntry;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+import ru.poscenter.tools.LoggerAdapter;
 
 public class JposPropertyReader implements JposConst {
 	
     private JposEntry jposEntry;
-    static Logger logger = LogManager.getLogger(JposPropertyReader.class);
+    static LoggerAdapter logger = LoggerAdapter.getLogger(JposPropertyReader.class);
+
     
     /** Creates a new instance of JposPropertyReader */
     public JposPropertyReader(JposEntry jposEntry) 

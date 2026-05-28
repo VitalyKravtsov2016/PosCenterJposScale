@@ -8,12 +8,11 @@ import java.util.Vector;
 import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
 import ru.poscenter.port.JSerialPort;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+import ru.poscenter.tools.LoggerAdapter;
 
 public class SmScale {
 
-    private final Logger logger = LogManager.getLogger(SmScale.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(SmScale.class);
 
     private int portType = IDevice.PARAM_PORTTYPE_SERIAL;
     private String portName = "COM1";

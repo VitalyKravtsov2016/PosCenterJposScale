@@ -4,13 +4,12 @@ import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
 import ru.poscenter.ShtrihMProtocolSerial;
 import ru.poscenter.port.JSerialPort;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+import ru.poscenter.tools.LoggerAdapter;
 
 public class Pos2Serial extends ScaleSerial {
 
     private ShtrihMProtocolSerial protocol = null;
-    private final Logger logger = LogManager.getLogger(Pos2Serial.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(Pos2Serial.class);
 
     // //////////////////////////////////////////////////////////////////////////
     // Scale command code constants

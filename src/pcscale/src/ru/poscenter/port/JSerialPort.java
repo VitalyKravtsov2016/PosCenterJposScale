@@ -7,8 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.Vector;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+import ru.poscenter.tools.LoggerAdapter;
 
 import com.fazecast.jSerialComm.SerialPort;
 import com.fazecast.jSerialComm.SerialPortIOException;
@@ -23,7 +22,7 @@ import ru.poscenter.port.SerialPortInterface;
 
 public class JSerialPort implements SerialPortInterface {
 
-    private final Logger logger = LogManager.getLogger(JSerialPort.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(JSerialPort.class);
 
     private final int bufferSize = 2048;
     private SerialPort port;

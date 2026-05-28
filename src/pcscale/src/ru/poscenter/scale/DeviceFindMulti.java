@@ -5,8 +5,7 @@ import java.util.Vector;
 import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
 import ru.poscenter.port.JSerialPort;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+import ru.poscenter.tools.LoggerAdapter;
 
 // Multithread device find 
 // Not working, because RXTX 2.1.7r2 is not thread safe
@@ -16,7 +15,7 @@ public class DeviceFindMulti {
 	private boolean started = false;
 	private Vector items = new Vector();
 	private final SmScale driver = SmScale.instance;
-	private final Logger logger = LogManager.getLogger(DeviceFindMulti.class);
+	private final LoggerAdapter logger = LoggerAdapter.getLogger(DeviceFindMulti.class);
 	private int startedCount = 0;
 
 	public DeviceFindMulti() {

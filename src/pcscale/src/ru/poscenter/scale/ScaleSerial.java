@@ -1,8 +1,5 @@
 package ru.poscenter.scale;
 
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
-
 import ru.poscenter.IDevice;
 import ru.poscenter.DeviceError;
 import ru.poscenter.EquipmentTools;
@@ -10,12 +7,13 @@ import ru.poscenter.port.SerialPortInterface;
 import ru.poscenter.tools.StringParams;
 import ru.poscenter.port.JSerialPort;
 import ru.poscenter.port.TcpSocketPort;
+import ru.poscenter.tools.LoggerAdapter;
 
 public class ScaleSerial implements IScale, IDevice {
 
     private SerialPortInterface serialPort = null;
     protected StringParams params = new StringParams();
-    private final Logger logger = LogManager.getLogger(ScaleSerial.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(ScaleSerial.class);
 
     public String getErrorText(int error) {
         switch (error) {

@@ -1,7 +1,7 @@
 #!/bin/sh
 
-java -cp ".:pcscale-1.14.10.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.jpostest.JposScaleTestApp
-#!java -cp ".:pcscale-1.14.10.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.scaletst.ScaleTest
-#!java -cp ".:pcscale-1.14.10.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.scalecalib.MainDialog
-#!java -cp ".:pcscale-1.14.10.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.test.ConsoleTest
-#!java -cp ".:pcscale-1.14.10.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.ScaleCLI
+java -cp ".:pcscale-1.14.11.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.jpostest.JposScaleTestApp
+#!java -cp ".:pcscale-1.14.11.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.scaletst.ScaleTest
+#!java -cp ".:pcscale-1.14.11.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.scalecalib.MainDialog
+#!java -cp ".:pcscale-1.14.11.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.test.ConsoleTest
+#!java -cp ".:pcscale-1.14.11.jar:javapos-1.14.2.jar:log4j-api-2.25.1.jar:log4j-core-2.25.1.jar:jSerialComm-2.10.5.jar:xercesImpl-2.12.2.jar" -Djava.library.path=. ru.poscenter.ScaleCLI

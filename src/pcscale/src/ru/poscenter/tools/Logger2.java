@@ -3,8 +3,7 @@ package ru.poscenter.tools;
 /**
  * @author V.Kravtsov
  */
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import ru.poscenter.tools.LoggerAdapter;
 
 public class Logger2 {
 
@@ -19,27 +18,27 @@ public class Logger2 {
         }
     }
 
-    public static void logTx(Logger logger, byte b) {
+    public static void logTx(LoggerAdapter logger, byte b) {
         logger.debug("-> " + HexUtils.toHex(b));
     }
 
-    public static void logTx(Logger logger, byte[] data) {
+    public static void logTx(LoggerAdapter logger, byte[] data) {
         logData(logger, "->", data);
     }
 
-    public static void logRx(Logger logger, byte b) {
+    public static void logRx(LoggerAdapter logger, byte b) {
         logger.debug("<- " + HexUtils.toHex(b));
     }
 
-    public static void logRx(Logger logger, byte b1, byte b2) {
+    public static void logRx(LoggerAdapter logger, byte b1, byte b2) {
         logger.debug("<- " + HexUtils.toHex(b1) + " " + HexUtils.toHex(b2));
     }
 
-    public static void logRx(Logger logger, byte[] data) {
+    public static void logRx(LoggerAdapter logger, byte[] data) {
         logData(logger, "<-", data);
     }
 
-    private static void logData(Logger logger, String prefix, byte[] data) {
+    private static void logData(LoggerAdapter logger, String prefix, byte[] data) {
         final int lineLen = 20;
         int count = (data.length + lineLen - 1) / lineLen;
         for (int i = 0; i < count; i++) {

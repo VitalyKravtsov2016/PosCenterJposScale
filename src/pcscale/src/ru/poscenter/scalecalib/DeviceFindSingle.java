@@ -6,8 +6,7 @@ import ru.poscenter.IDevice;
 import ru.poscenter.tools.StringParams;
 import ru.poscenter.scale.Pos2Serial;
 import ru.poscenter.port.JSerialPort;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import ru.poscenter.tools.LoggerAdapter;
 
 // Single thread device find
 public class DeviceFindSingle implements Runnable {
@@ -17,7 +16,7 @@ public class DeviceFindSingle implements Runnable {
     private boolean started = false;
     private Vector items = new Vector();
     private final SmScale driver = SmScale.instance;
-    private final Logger logger = LogManager.getLogger(DeviceFindSingle.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(DeviceFindSingle.class);
 
     public DeviceFindSingle() {
     }

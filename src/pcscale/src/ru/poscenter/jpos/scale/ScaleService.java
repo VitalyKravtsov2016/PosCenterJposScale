@@ -8,9 +8,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
-
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.FlowLayout;
@@ -27,6 +24,7 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
+import ru.poscenter.tools.LoggerAdapter;
 import ru.poscenter.DeviceError;
 import ru.poscenter.IDevice;
 import ru.poscenter.jpos.JposPropertyReader;
@@ -63,7 +61,7 @@ import ru.poscenter.scale.ChannelParams;
 public class ScaleService extends Scale implements ScaleService114 {
 
     private static final long serialVersionUID = 6309237509625068100L;
-    private final Logger logger = LogManager.getLogger(ScaleService.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(ScaleService.class);
 
     // Константы
     private static final int POLL_INTERVAL_MS = 500;
@@ -143,7 +141,6 @@ public class ScaleService extends Scale implements ScaleService114 {
     private static class Statistics {
 
         // Device Information (неизменяемые)
-
         private final String unifiedPOSVersion = "1.15";
         private final String deviceCategory = "Scale";
         private String manufacturerName = "SHTRIKH-M";
@@ -875,6 +872,15 @@ public class ScaleService extends Scale implements ScaleService114 {
         // Инициализация capabilities для 1.14 (по умолчанию false)
         initCapabilities114();
 
+        boolean logEnabled = false;
+        if (m_jposEntry != null) {
+            if (m_jposEntry.hasPropertyWithName("logEnabled")) {
+                logEnabled = ((String) m_jposEntry.getPropertyValue("logEnabled")).equals("1");
+            }
+        }
+        logger.setEnabled(logEnabled);
+        logReportVersion();
+
         StringParams params = new StringParams();
         params.set(IDevice.PARAM_PORTNAME, "");
         params.set(IDevice.PARAM_DATABITS, "8");
@@ -965,6 +971,20 @@ public class ScaleService extends Scale implements ScaleService114 {
         capSpecialTare = false;
         capTarePriority = false;
         minimumWeight = 0;
+    }
+
+    public void logReportVersion() {
+        logger.debug("-----------------------------------------------");
+        logger.debug("POSCenter JavaPos Scale service");
+        logger.debug("DeviceServiceVersion: "
+                + String.valueOf(ServiceVersionUtil.getVersionInt()));
+        logger.debug("Java version: " + System.getProperty("java.version"));
+        logger.debug("File encoding: " + System.getProperty("file.encoding"));
+        logger.debug("OS: " + System.getProperty("os.name"));
+        logger.debug("OS ARCH: " + System.getProperty("os.arch"));
+        logger.debug("OS Version: " + System.getProperty("os.version"));
+        logger.debug("Library path: " + System.getProperty("java.library.path"));
+        logger.debug("-----------------------------------------------");
     }
 
     @Override
@@ -2087,11 +2107,9 @@ public class ScaleService extends Scale implements ScaleService114 {
             try {
                 pollThread.join(THREAD_STOP_TIMEOUT_MS);
             } catch (InterruptedException e) {
-                logger.error("Error stopping pollThread", e);
                 Thread.currentThread().interrupt();
             }
             pollThread = null;
-            logger.debug("Poll thread stopped");
         }
     }
 
@@ -2108,11 +2126,9 @@ public class ScaleService extends Scale implements ScaleService114 {
             try {
                 eventThread.join(THREAD_STOP_TIMEOUT_MS);
             } catch (InterruptedException e) {
-                logger.error("Error stopping eventThread", e);
                 Thread.currentThread().interrupt();
             }
             eventThread = null;
-            logger.debug("Event thread stopped");
         }
     }
 
@@ -2148,8 +2164,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             while (!Thread.interrupted() && deviceEnabled) {
                 try {
                     readScaleWeight();
-                } catch (Exception e) 
-                {
+                } catch (Exception e) {
                     setPowerState(JPOS_PS_OFF_OFFLINE);
                 }
                 Thread.sleep(POLL_INTERVAL_MS);
@@ -2235,8 +2250,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void weightProc() {
         logger.debug("Weight thread started");
         try {
-            while (!Thread.interrupted()) 
-            {
+            while (!Thread.interrupted()) {
                 try {
                     WeightRequest request = requestQueue.take();
                     logger.debug("Processing request #" + request.getId()
@@ -2327,8 +2341,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             ScaleWeight weight = null;
             try {
                 weight = scale.getWeight();
-            } catch (DeviceError e) 
-            {
+            } catch (DeviceError e) {
                 // Ошибка связи - увеличиваем счетчик ошибок связи
                 if (statistics != null) {
                     statistics.incrementCommunicationErrorCount();
@@ -2365,8 +2378,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         }
     }
 
-    private void generateStatusEvents(ScaleWeight newWeight) 
-    {
+    private void generateStatusEvents(ScaleWeight newWeight) {
         setPowerState(JPOS_PS_ONLINE);
         if (statusNotify != SCAL_SN_ENABLED) {
             return;
@@ -2429,13 +2441,12 @@ public class ScaleService extends Scale implements ScaleService114 {
     }
 
     // ======================== УПРАВЛЕНИЕ ПИТАНИЕМ ========================
-    public void setPowerState(int newPowerState) 
-    {
+    public void setPowerState(int newPowerState) {
         // Устанавливаем состояние питания
         if (statistics != null) {
             statistics.setPowered(newPowerState == JPOS_PS_ONLINE);
         }
-        
+
         if (powerNotify == JPOS_PN_ENABLED && newPowerState != this.powerState) {
             switch (newPowerState) {
                 case JPOS_PS_ONLINE:

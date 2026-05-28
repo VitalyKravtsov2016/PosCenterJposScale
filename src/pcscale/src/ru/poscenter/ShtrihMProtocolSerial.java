@@ -6,8 +6,7 @@ import ru.poscenter.scale.ScaleCommand;
 import ru.poscenter.scale.ScaleSerial;
 import ru.poscenter.port.SerialPortInterface;
 import ru.poscenter.tools.Logger2;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+import ru.poscenter.tools.LoggerAdapter;
 
 /* 
  * Протокол Штрих-М по которому работают ФРы и Весы 
@@ -18,7 +17,7 @@ public class ShtrihMProtocolSerial {
     private static final int maxENQCount = 1;
     private int byteTimeout = 300;
     private final SerialPortInterface serialPort;
-    private final Logger logger = LogManager.getLogger(ShtrihMProtocolSerial.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(ShtrihMProtocolSerial.class);
 
     public ShtrihMProtocolSerial(SerialPortInterface serialPort) {
         this.serialPort = serialPort;

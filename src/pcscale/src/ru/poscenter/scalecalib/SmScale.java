@@ -13,12 +13,11 @@ import ru.poscenter.scale.ChannelParams;
 import ru.poscenter.scale.DeviceMetrics;
 import ru.poscenter.scale.CalibrationStatus;
 import ru.poscenter.port.JSerialPort;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import ru.poscenter.tools.LoggerAdapter;
 
 public class SmScale {
 
-    private final Logger logger = LogManager.getLogger(SmScale.class);
+    private final LoggerAdapter logger = LoggerAdapter.getLogger(SmScale.class);
 
     private int pointNumber = 1;
     private String portName = "COM1";

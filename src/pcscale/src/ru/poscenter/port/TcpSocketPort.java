@@ -1,19 +1,18 @@
 package ru.poscenter.port;
 
-import ru.poscenter.tools.Logger2;
 
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+import ru.poscenter.tools.Logger2;
+import ru.poscenter.tools.LoggerAdapter;
 
 /**
  * @author V.Kravtsov
  */
 public class TcpSocketPort implements SerialPortInterface {
 
-    private static Logger logger = LogManager.getLogger(TcpSocketPort.class);
+    private static LoggerAdapter logger = LoggerAdapter.getLogger(TcpSocketPort.class);
 
     public String portName;
     public int readTimeout = 1000;

@@ -18,6 +18,7 @@
         <prop name="protocol" type="String" value="pos2"/>
         <prop name="password" type="String" value="30"/>
         <prop name="timeout" type="String" value="1000"/>
+        <prop name="logEnabled" type="String" value="1"/>
     </JposEntry> 
     
    <JposEntry logicalName="ScaleSimulator">
