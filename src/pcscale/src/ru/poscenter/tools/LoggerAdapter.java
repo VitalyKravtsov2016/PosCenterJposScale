@@ -20,7 +20,7 @@ import ru.poscenter.port.JSerialPort;
 public class LoggerAdapter {
 
     private final Logger logger;
-    private boolean enabled = false;
+    private static volatile boolean enabled = false;
 
     private LoggerAdapter(String className) {
         logger = LogManager.getLogger(className);
@@ -35,7 +35,7 @@ public class LoggerAdapter {
     }
 
     public void setEnabled(boolean value) {
-        this.enabled = value;
+        enabled = value;
     }
 
     public boolean getEnabled() {
