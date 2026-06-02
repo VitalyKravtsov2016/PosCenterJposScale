@@ -90,7 +90,12 @@ public class JSerialPort implements SerialPortInterface {
             port.setComPortParameters(baudRate, dataBits, stopBits, parity);
             port.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
             return true;
-        } catch (SerialPortInvalidPortException e) {
+        } catch (SerialPortInvalidPortException e) 
+        {
+            if (port != null) {
+                port.closePort();
+            }
+            port = null;
             return false;
         }
     }
@@ -188,15 +193,7 @@ public class JSerialPort implements SerialPortInterface {
             if (flush) {
                 out.flush();
             }
-        } catch (SerialPortTimeoutException e) {
-            close();
-            throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
-        }
-        catch(SerialPortIOException e){
-            close();
-            throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
-        }
-        catch(SerialPortInvalidPortException e){
+        } catch (Exception e) {
             close();
             throw new DeviceError(IDevice.ERROR_NOSUCHPORT, IDevice.TEXT_ERROR_NOTSUCHPORT);
         }
