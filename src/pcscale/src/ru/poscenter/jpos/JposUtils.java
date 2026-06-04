@@ -7,7 +7,6 @@ package ru.poscenter.jpos;
 
 import jpos.JposConst;
 import jpos.JposException;
-import jpos.ScaleConst;
 
 /**
  *
@@ -43,7 +42,9 @@ public class JposUtils {
         }
     }
 
-    /** Имя константы JposConst для ErrorCode. */
+    /**
+     * Имя константы JposConst для ErrorCode.
+     */
     public static String getErrorCodeText(int errorCode) {
         switch (errorCode) {
             case JposConst.JPOS_SUCCESS:
@@ -77,42 +78,77 @@ public class JposUtils {
             case JposConst.JPOS_E_EXTENDED:
                 return "JPOS_E_EXTENDED";
             default:
-                return "?";
+                return String.valueOf(errorCode);
         }
     }
 
-    /** Имя константы ScaleConst для ErrorCodeExtended (категория Scale). */
-    public static String getScaleErrorExtendedText(int errorCodeExtended) {
-        switch (errorCodeExtended) {
-            case ScaleConst.JPOS_ESCAL_OVERWEIGHT:
-                return "JPOS_ESCAL_OVERWEIGHT";
-            case ScaleConst.JPOS_ESCAL_UNDER_ZERO:
-                return "JPOS_ESCAL_UNDER_ZERO";
-            case ScaleConst.JPOS_ESCAL_SAME_WEIGHT:
-                return "JPOS_ESCAL_SAME_WEIGHT";
+    public static String getStatusUpdateEventText(int value) {
+        switch (value) {
+            case JposConst.JPOS_SUE_POWER_ONLINE:
+                return "JPOS_SUE_POWER_ONLINE";
+
+            case JposConst.JPOS_SUE_POWER_OFF:
+                return "JPOS_SUE_POWER_OFF";
+
+            case JposConst.JPOS_SUE_POWER_OFFLINE:
+                return "JPOS_SUE_POWER_OFFLINE";
+
+            case JposConst.JPOS_SUE_POWER_OFF_OFFLINE:
+                return "JPOS_SUE_POWER_OFF_OFFLINE";
+
+            case JposConst.JPOS_SUE_UF_PROGRESS:
+                return "JPOS_SUE_UF_PROGRESS";
+
+            case JposConst.JPOS_SUE_UF_COMPLETE:
+                return "JPOS_SUE_UF_COMPLETE";
+
+            case JposConst.JPOS_SUE_UF_FAILED_DEV_OK:
+                return "JPOS_SUE_UF_FAILED_DEV_OK";
+
+            case JposConst.JPOS_SUE_UF_FAILED_DEV_UNRECOVERABLE:
+                return "JPOS_SUE_UF_FAILED_DEV_UNRECOVERABLE";
+
+            case JposConst.JPOS_SUE_UF_FAILED_DEV_NEEDS_FIRMWARE:
+                return "JPOS_SUE_UF_FAILED_DEV_NEEDS_FIRMWARE";
+
+            case JposConst.JPOS_SUE_UF_FAILED_DEV_UNKNOWN:
+                return "JPOS_SUE_UF_FAILED_DEV_UNKNOWN";
+
+            case JposConst.JPOS_SUE_UF_COMPLETE_DEV_NOT_RESTORED:
+                return "JPOS_SUE_UF_COMPLETE_DEV_NOT_RESTORED";
             default:
-                return "?";
+                return String.valueOf(value);
         }
     }
 
-    /**
-     * Текст ошибки JposException для отображения в UI: коды с именами констант,
-     * при JPOS_E_EXTENDED — также ErrorCodeExtended.
-     */
-    public static String formatJposException(JposException ex) {
-        StringBuilder sb = new StringBuilder();
-        int code = ex.getErrorCode();
-        sb.append("ErrorCode=").append(code).append(" (").append(getErrorCodeText(code)).append(")");
-        int ext = ex.getErrorCodeExtended();
-        if (code == JposConst.JPOS_E_EXTENDED || ext != 0) {
-            sb.append("\nErrorCodeExtended=").append(ext)
-                    .append(" (").append(getScaleErrorExtendedText(ext)).append(")");
+    public static String getErrorLocusText(int value) {
+        switch (value) {
+            case JposConst.JPOS_EL_OUTPUT:
+                return "JPOS_EL_OUTPUT";
+
+            case JposConst.JPOS_EL_INPUT:
+                return "JPOS_EL_INPUT";
+
+            case JposConst.JPOS_EL_INPUT_DATA:
+                return "JPOS_EL_INPUT_DATA";
+            default:
+                return String.valueOf(value);
         }
-        String message = ex.getMessage();
-        if (message != null && !message.isEmpty()) {
-            sb.append("\n").append(message);
+    }
+
+    public static String getErrorResponseText(int value) {
+        switch (value) {
+            case JposConst.JPOS_ER_RETRY:
+                return "JPOS_ER_RETRY";
+
+            case JposConst.JPOS_ER_CLEAR:
+                return "JPOS_ER_CLEAR";
+
+            case JposConst.JPOS_ER_CONTINUEINPUT:
+                return "JPOS_ER_CONTINUEINPUT";
+            default:
+                return String.valueOf(value);
         }
-        return sb.toString();
     }
 
 }

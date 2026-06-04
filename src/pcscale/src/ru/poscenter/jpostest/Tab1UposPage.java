@@ -10,8 +10,9 @@ import jpos.JposException;
 import jpos.Scale;
 import jpos.events.DataEvent;
 import jpos.events.DataListener;
-
 import ru.poscenter.jpos.JposUtils;
+import ru.poscenter.jpos.JposScaleUtils;
+
 
 /**
  * Закладка 1: Общие методы UPOS.
@@ -402,7 +403,7 @@ public class Tab1UposPage extends JPanel implements DataListener {
     }
 
     private void showError(String method, JposException ex) {
-        String msg = method + "() ОШИБКА:\n" + JposUtils.formatJposException(ex);
+        String msg = method + "() ОШИБКА:\n" + JposScaleUtils.formatJposException(ex);
         taResult.setForeground(Color.RED);
         taResult.setText(msg);
         eventsPage.log(msg);

@@ -53,6 +53,7 @@ import jpos.events.OutputCompleteEvent;
 import jpos.events.StatusUpdateEvent;
 import jpos.services.EventCallbacks;
 import jpos.services.ScaleService114;
+import ru.poscenter.jpos.JposScaleUtils;
 import ru.poscenter.scale.ChannelParams;
 
 /**
@@ -2222,6 +2223,7 @@ public class ScaleService extends Scale implements ScaleService114 {
 
     private void handleErrorResponse(ErrorEvent errorEvent) {
         int response = errorEvent.getErrorResponse();
+        errorEvent.setErrorResponse(JPOS_ER_CLEAR);
         logger.debug("handleErrorResponse: response=" + response);
         WeightRequest request = errorEvent instanceof RequestErrorEvent
                 ? ((RequestErrorEvent) errorEvent).getRequest()
@@ -2298,22 +2300,19 @@ public class ScaleService extends Scale implements ScaleService114 {
     }
 
     private void handleWeightError(JposException e, WeightRequest request) {
-        boolean canRetry = isRetryableError(e) && request.getRetryCount() < MAX_RETRY_COUNT;
 
         setState(JPOS_S_ERROR);
-
         ErrorEvent errorEvent = new RequestErrorEvent(
                 this,
                 request,
                 e.getErrorCode(),
                 e.getErrorCodeExtended(),
                 JPOS_EL_INPUT,
-                canRetry ? JPOS_ER_RETRY : JPOS_ER_CLEAR
+                JPOS_ER_CLEAR
         );
 
         addEvent(errorEvent);
         logger.debug("Error event queued for request #" + request.getId()
-                + ", canRetry=" + canRetry
                 + ", errorCode=" + e.getErrorCode());
     }
 
@@ -2411,7 +2410,7 @@ public class ScaleService extends Scale implements ScaleService114 {
     }
 
     private void addStatusEvent(int status) {
-        if (status >= SCL_SUE_STABLE_WEIGHT && status <= SCAL_SUE_WEIGHT_UNDER_ZERO) {
+        if (status >= SCAL_SUE_STABLE_WEIGHT && status <= SCAL_SUE_WEIGHT_UNDER_ZERO) {
             if (statusNotify == SCAL_SN_ENABLED) {
                 addEvent(new StatusUpdateEvent(this, status));
             }
@@ -2425,18 +2424,24 @@ public class ScaleService extends Scale implements ScaleService114 {
             return;
         }
 
-        logger.debug("fireJposEvent: " + event.getClass().getSimpleName());
-
         if (event instanceof StatusUpdateEvent) {
+            logger.debug("fireStatusUpdateEvent: " + JposScaleUtils.getEventText(event));
             eventsCallback.fireStatusUpdateEvent((StatusUpdateEvent) event);
         } else if (event instanceof DataEvent) {
+            logger.debug("fireDataEvent: " + JposScaleUtils.getEventText(event));
             eventsCallback.fireDataEvent((DataEvent) event);
         } else if (event instanceof ErrorEvent) {
+            logger.debug("fireErrorEvent.before: " + JposScaleUtils.getEventText(event));
             eventsCallback.fireErrorEvent((ErrorEvent) event);
+            logger.debug("fireErrorEvent.after: " + JposScaleUtils.getEventText(event));
         } else if (event instanceof DirectIOEvent) {
+            logger.debug("fireDirectIOEvent: " + JposScaleUtils.getEventText(event));
             eventsCallback.fireDirectIOEvent((DirectIOEvent) event);
         } else if (event instanceof OutputCompleteEvent) {
+            logger.debug("fireOutputCompleteEvent: " + JposScaleUtils.getEventText(event));
             eventsCallback.fireOutputCompleteEvent((OutputCompleteEvent) event);
+        } else {
+            logger.error("invalidJposEvent: " + JposScaleUtils.getEventText(event));
         }
     }
 

@@ -32,16 +32,16 @@ public class JposUtilsTest {
     public void testGetErrorCodeText() {
         assertEquals("JPOS_E_CLOSED", JposUtils.getErrorCodeText(JposConst.JPOS_E_CLOSED));
         assertEquals("JPOS_E_EXTENDED", JposUtils.getErrorCodeText(JposConst.JPOS_E_EXTENDED));
-        assertEquals("?", JposUtils.getErrorCodeText(99999));
+        assertEquals("99999", JposUtils.getErrorCodeText(99999));
     }
 
     @Test
     public void testGetScaleErrorExtendedText() {
         assertEquals("JPOS_ESCAL_OVERWEIGHT",
-                JposUtils.getScaleErrorExtendedText(ScaleConst.JPOS_ESCAL_OVERWEIGHT));
+                JposScaleUtils.getErrorCodeExtendedText(ScaleConst.JPOS_ESCAL_OVERWEIGHT));
         assertEquals("JPOS_ESCAL_UNDER_ZERO",
-                JposUtils.getScaleErrorExtendedText(ScaleConst.JPOS_ESCAL_UNDER_ZERO));
-        assertEquals("?", JposUtils.getScaleErrorExtendedText(0));
+                JposScaleUtils.getErrorCodeExtendedText(ScaleConst.JPOS_ESCAL_UNDER_ZERO));
+        assertEquals("0", JposScaleUtils.getErrorCodeExtendedText(0));
     }
 
     @Test
@@ -50,7 +50,7 @@ public class JposUtilsTest {
                 JposConst.JPOS_E_EXTENDED,
                 ScaleConst.JPOS_ESCAL_OVERWEIGHT,
                 "Weight exceeds maximum");
-        String text = JposUtils.formatJposException(ex);
+        String text = JposScaleUtils.formatJposException(ex);
         assertTrue(text.contains("JPOS_E_EXTENDED"));
         assertTrue(text.contains("JPOS_ESCAL_OVERWEIGHT"));
         assertTrue(text.contains("Weight exceeds maximum"));
