@@ -293,8 +293,9 @@ public class Pos2Serial extends ScaleSerial {
         int status = reply.readShort();
         int weight = channelParams.scaleToValue(reply.readInt());
         int tare = channelParams.scaleToValue(reply.readShort());
-        this.weight = new ScaleWeight(weight, tare, new ScaleStatus(status));
-        logger.debug("weight = " + weight + ", tare = " + tare + ", flags = " + status);
+        ScaleStatus scaleStatus = new ScaleStatus(status);
+        this.weight = new ScaleWeight(weight, tare, scaleStatus);
+        logger.debug("weight = " + weight + ", tare = " + tare + ", status = " + scaleStatus.toString());
     }
 
     public void writeCalibrationPoint(int number, int weight) throws Exception {

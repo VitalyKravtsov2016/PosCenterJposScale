@@ -1178,13 +1178,15 @@ public class ScaleService extends Scale implements ScaleService114 {
     public void clearInput() throws JposException {
         logger.debug("clearInput()");
         checkOpened();
+        doClearInput();
+        logger.debug("clearInput: OK");
+    }
 
-        // Очищаем только DataEvent из очереди
-        eventQueue.removeIf(event -> event instanceof DataEvent);
+    public void doClearInput() {
+        // Очищаем DataEvent и ErrorEvent из очереди
+        eventQueue.removeIf(event -> (event instanceof DataEvent) || (event instanceof ErrorEvent));
         requestQueue.clear();
         setState(JPOS_S_IDLE);
-
-        logger.debug("clearInput: OK");
     }
 
     public synchronized void checkIdleState() throws JposException {
@@ -1208,9 +1210,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             if (asyncMode) {
                 // Атомарная проверка и установка состояния
                 synchronized (this) {
-                    if (state == JPOS_S_BUSY || state == JPOS_S_ERROR) {
-                        throw new JposException(JPOS_E_BUSY, "Asynchronous operation already in progress");
-                    }
+                    checkIdleState();
                     setState(JPOS_S_BUSY);
                 }
                 requestQueue.offer(new WeightRequest(timeout));
@@ -1272,9 +1272,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         try {
             if (asyncMode) {
                 synchronized (this) {
-                    if (state == JPOS_S_BUSY) {
-                        throw new JposException(JPOS_E_BUSY, "Asynchronous operation already in progress");
-                    }
+                    checkIdleState();
                     setState(JPOS_S_BUSY);
                 }
                 // Для асинхронного режима - используем существующий механизм запросов
@@ -1398,9 +1396,7 @@ public class ScaleService extends Scale implements ScaleService114 {
         try {
             if (asyncMode) {
                 synchronized (this) {
-                    if (state == JPOS_S_BUSY) {
-                        throw new JposException(JPOS_E_BUSY, "Asynchronous operation already in progress");
-                    }
+                    checkIdleState();
                     setState(JPOS_S_BUSY);
                 }
                 requestQueue.offer(new WeightRequest(timeout));
@@ -2076,7 +2072,8 @@ public class ScaleService extends Scale implements ScaleService114 {
         throw new InterruptedException("Thread interrupted while reading weight");
     }
 
-    private void checkWeightErrors(ScaleWeight weight) throws JposException {
+    private void checkWeightErrors(ScaleWeight weight) throws JposException 
+    {
         if (weight.status.isOverweight()) {
             throw new JposException(JPOS_E_EXTENDED,
                     JPOS_ESCAL_OVERWEIGHT,
@@ -2089,6 +2086,15 @@ public class ScaleService extends Scale implements ScaleService114 {
                     "Weight below zero");
         }
 
+        if (weight.status.isADCNotResponding()){
+            throw new JposException(JPOS_E_FAILURE,
+                    "ADC not responding");
+        }
+        
+        if (weight.status.isAutoZeroError()){
+            throw new JposException(JPOS_E_FAILURE,
+                    "Autozero error");
+        }
     }
 
     // ======================== УПРАВЛЕНИЕ ПОТОКАМИ ========================
@@ -2245,7 +2251,7 @@ public class ScaleService extends Scale implements ScaleService114 {
             }
         } else if (response == JPOS_ER_CLEAR) {
             logger.debug("ER_CLEAR received");
-            setState(JPOS_S_IDLE);
+            doClearInput();
         }
     }
 
@@ -2314,20 +2320,6 @@ public class ScaleService extends Scale implements ScaleService114 {
         addEvent(errorEvent);
         logger.debug("Error event queued for request #" + request.getId()
                 + ", errorCode=" + e.getErrorCode());
-    }
-
-    private boolean isRetryableError(JposException e) {
-        if (e.getErrorCode() != JPOS_E_EXTENDED) {
-            return false;
-        }
-
-        switch (e.getErrorCodeExtended()) {
-            case JPOS_ESCAL_OVERWEIGHT:
-            case JPOS_ESCAL_UNDER_ZERO:
-                return true;
-            default:
-                return false;
-        }
     }
 
     // ======================== ЧТЕНИЕ ВЕСА ========================

@@ -21,6 +21,7 @@ import ru.poscenter.scale.ChannelParams;
 
 import jpos.BaseControl;
 import jpos.JposConst;
+import static jpos.JposConst.JPOS_E_FAILURE;
 import jpos.JposException;
 import jpos.ScaleConst;
 import jpos.events.DataEvent;
@@ -405,7 +406,7 @@ public class ScaleServiceTest {
             service.readWeight(null, 1000);
             fail("readWeight должен быть отклонен в JPOS_S_ERROR");
         } catch (JposException e) {
-            assertEquals(JposConst.JPOS_E_BUSY, e.getErrorCode());
+            assertEquals(JposConst.JPOS_E_FAILURE, e.getErrorCode());
         }
 
         cleanup();
