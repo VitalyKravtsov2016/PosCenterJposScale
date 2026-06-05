@@ -36,6 +36,7 @@ public class ScaleTests implements DataListener {
             scale.open("Scale");
             try {
                 reportCapablities(scale);
+                scale.setZeroValid(true);
                 scale.claim(1000);
                 scale.setDeviceEnabled(true);
                 scale.setAsyncMode(false);
